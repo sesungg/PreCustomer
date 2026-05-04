@@ -9,6 +9,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+/**
+ * DeepSeek Feign Client 기반 리포트 생성 파이프라인.
+ * Python 스크립트(generate, select, generate_final)를 Java로 마이그레이션.
+ * ML 관련 코드(점수 예측/학습/라벨링)는 Python 그대로 유지.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -18,8 +23,10 @@ public class PipelineJavaService {
     private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
 
-    // === Product Target Profile (Python: generate_product_target_profile.py) ===
-
+    /**
+     * 상품 타겟 프로필 생성.
+     * 주문 정보를 DeepSeek으로 분석하여 product_target_profile에 저장.
+     */
     public void generateTargetProfile(Long orderId) {
         var order = jdbc.queryForMap("SELECT * FROM report_order WHERE id = ?", orderId);
         String auth = "Bearer " + System.getenv("DEEPSEEK_API_KEY");
@@ -60,8 +67,10 @@ public class PipelineJavaService {
         }
     }
 
-    // === Persona Selection (Python: select_personas_for_detail_page_generic.py) ===
-
+    /**
+     * 100만 페르소나 풀에서 계층화 샘플링으로 지정된 수만큼 선별.
+     * NEMOTRON 소스 우선, 부족 시 SEED로 보충. 직업군별 비례 할당.
+     */
     public List<Map<String, Object>> selectPersonas(Long orderId, int count) {
         // NEMOTRON 우선, SEED 보충
         List<Map<String, Object>> pool = new ArrayList<>();
@@ -109,8 +118,7 @@ public class PipelineJavaService {
         return selected;
     }
 
-    // === Persona Reactions (Python: generate_reactions_for_detail_page.py) ===
-
+    /** 선별된 페르소나 각각에 대해 DeepSeek로 상세페이지 반응 생성 (구매의향/신뢰도/가격수용도 등). 결과는 persona_reaction에 저장. */
     public void generateReactions(Long orderId, List<Map<String, Object>> personas) {
         var order = jdbc.queryForMap("SELECT * FROM report_order WHERE id = ?", orderId);
         String auth = "Bearer " + System.getenv("DEEPSEEK_API_KEY");
@@ -166,8 +174,7 @@ public class PipelineJavaService {
         log.info("Reactions generated for {} personas, orderId={}", personas.size(), orderId);
     }
 
-    // === Final Report (Python: generate_final_detail_page_report.py) ===
-
+    /** 30명 반응을 DeepSeek으로 종합하여 최종 진단/분석/개선제안 생성. final_report에 저장. */
     public void generateFinalReport(Long orderId) {
         var order = jdbc.queryForMap("SELECT * FROM report_order WHERE id = ?", orderId);
         List<Map<String, Object>> reactions = jdbc.queryForList("""

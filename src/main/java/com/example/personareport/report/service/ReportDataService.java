@@ -7,12 +7,14 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/** 리포트 데이터 조회 서비스. final_report/persona_reaction/persona_profile 쿼리를 JdbcTemplate으로 직접 실행. */
 @Service
 @RequiredArgsConstructor
 public class ReportDataService {
 
     private final JdbcTemplate jdbc;
 
+    /** orderId 기준 최신 final_report 1건 조회. */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> findReportByOrderId(Long orderId) {
         return jdbc.queryForList(
@@ -31,6 +33,7 @@ public class ReportDataService {
         return count != null ? count : 0;
     }
 
+    /** 고객군별 집계 (인원수/평균점수). */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> findSegments(Long orderId) {
         return jdbc.queryForList("""
@@ -53,6 +56,7 @@ public class ReportDataService {
                 orderId);
     }
 
+    /** 페르소나 반응 목록. persona_profile과 JOIN하여 인구통계 정보 포함. */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> findReactions(Long orderId) {
         return jdbc.queryForList("""
@@ -71,6 +75,7 @@ public class ReportDataService {
                 """, orderId);
     }
 
+    /** 개별 페르소나 반응 상세. */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> findReactionById(Long reactionId) {
         return jdbc.queryForList("""

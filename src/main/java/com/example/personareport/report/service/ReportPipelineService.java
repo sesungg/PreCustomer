@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+/** 리포트 생성 파이프라인 오케스트레이터. @Async 백그라운드 실행, PipelineProgress에 진행상황 기록. */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -43,6 +44,7 @@ public class ReportPipelineService {
     @Value("${app.pipeline.db-password:postgres}")
     private String dbPassword;
 
+    /** 비동기로 전체 파이프라인 실행. 크롤링→이미지분석→타겟프로필→페르소나선별→반응생성→최종리포트. */
     @Async
     public void runDetailPagePipeline(Long orderId, List<Path> imagePaths) {
         boolean hasImages = imagePaths != null && !imagePaths.isEmpty();
