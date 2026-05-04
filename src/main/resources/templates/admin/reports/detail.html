@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="'분석 결과 | ' + ${order.project_name}">분석 결과</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        :root{--blue:#2563eb;--slate:#1e293b;--gray:#64748b;--border:#e2e8f0;--surface:#f8fafc;--amber:#d97706;--green:#059669;--red:#dc2626}
+        .report{max-width:1000px;margin:0 auto;font-family:'Pretendard','Inter',system-ui,-apple-system,sans-serif;color:var(--slate)}
+        .rpt-header{background:#fff;border:1px solid var(--border);border-radius:12px;padding:36px 40px;margin-bottom:24px}
+        .rpt-header h1{font-size:1.6rem;font-weight:800;margin:0 0 4px;letter-spacing:-0.02em}
+        .rpt-header .subtitle{font-size:0.9rem;color:var(--gray);margin:0 0 16px}
+        .rpt-header .meta-row{display:flex;flex-wrap:wrap;gap:8px 24px;font-size:0.82rem;color:var(--gray)}
+        .rpt-header .meta-row span{white-space:nowrap}
+        .conclusion-box{background:linear-gradient(135deg,#eff6ff 0%,#f8fafc 100%);border-left:4px solid var(--blue);padding:24px 28px;margin-bottom:24px;border-radius:0 8px 8px 0;font-size:0.95rem;line-height:1.85}
+        .conclusion-box h2{font-size:0.85rem;font-weight:700;color:var(--blue);margin:0 0 8px;letter-spacing:0.05em}
+        .score-ribbon{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:24px}
+        .score-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:20px 12px;text-align:center}
+        .score-card .val{font-size:2.2rem;font-weight:800;line-height:1.1}
+        .score-card .lbl{font-size:0.78rem;color:var(--gray);margin:4px 0}
+        .score-card .status{font-size:0.72rem;font-weight:600;padding:1px 8px;border-radius:3px;display:inline-block;margin-bottom:4px}
+        .st-good{background:#d1fae5;color:#065f46}.st-ok{background:#dbeafe;color:#1e40af}
+        .st-warn{background:#fef3c7;color:#92400e}.st-bad{background:#fee2e2;color:#991b1b}
+        .score-card .desc{font-size:0.72rem;color:var(--gray);line-height:1.4;margin-top:4px}
+        .charts-row{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px}
+        .chart-box{background:#fff;border:1px solid var(--border);border-radius:12px;padding:24px}
+        .chart-box h3{font-size:0.9rem;font-weight:700;margin:0 0 12px;color:var(--slate)}
+        .chart-box canvas{max-height:260px}
+        .chart-box .chart-note{font-size:0.78rem;color:var(--gray);margin-top:12px;line-height:1.5}
+        .section{background:#fff;border:1px solid var(--border);border-radius:12px;padding:28px;margin-bottom:20px}
+        .section h2{font-size:1.05rem;font-weight:700;color:var(--slate);margin:0 0 16px;padding-bottom:10px;border-bottom:2px solid var(--border)}
+        .section .content{font-size:0.92rem;line-height:1.85;color:#334155}
+        .takeaway{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:14px 18px;margin-top:16px;font-size:0.88rem;line-height:1.6}
+        .takeaway strong{color:var(--amber);font-size:0.75rem;letter-spacing:0.05em;display:block;margin-bottom:2px}
+        .summary-table{width:100%;border-collapse:collapse;font-size:0.85rem}
+        .summary-table th{background:var(--surface);padding:8px 10px;text-align:left;font-weight:600;color:var(--slate);border-bottom:2px solid var(--border);font-size:0.78rem}
+        .summary-table td{padding:10px;border-bottom:1px solid var(--border);vertical-align:middle;line-height:1.5}
+        .summary-table tbody tr:hover{background:#f8fafc}
+        .persona-table{width:100%;border-collapse:collapse;font-size:0.8rem}
+        .persona-table th{background:var(--surface);padding:8px;text-align:left;font-weight:600;color:var(--slate);border-bottom:2px solid var(--border);white-space:nowrap;font-size:0.75rem}
+        .persona-table td{padding:8px;border-bottom:1px solid var(--border);vertical-align:middle}
+        .persona-table tbody tr:hover{background:#f8fafc}
+        .badge{display:inline-block;padding:2px 7px;border-radius:3px;font-size:0.7rem;font-weight:600}
+        .bg-core{background:#dbeafe;color:#1e40af}.bg-adjacent{background:#e0e7ff;color:#3730a3}
+        .bg-skeptic{background:#fee2e2;color:#991b1b}.bg-low{background:#f3f4f6;color:#374151}.bg-random{background:#fef3c7;color:#92400e}
+        .sent-pos{color:var(--green);font-weight:600}.sent-neg{color:var(--red);font-weight:600}
+        .sent-mix{color:var(--amber);font-weight:600}.sent-neu{color:var(--gray);font-weight:600}
+        .filter-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+        .filter-row select,.filter-row input{padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.8rem;font-family:inherit}
+        .disclaimer{background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:14px 18px;font-size:0.8rem;color:#92400e;margin-top:24px;text-align:center;line-height:1.6}
+        @media(max-width:768px){.score-ribbon{grid-template-columns:repeat(2,1fr)}.charts-row{grid-template-columns:1fr}.persona-table{font-size:0.7rem}}
+        @media print{body{background:#fff;font-size:10pt}.site-header{display:none}.report{max-width:100%}.section{page-break-inside:avoid;box-shadow:none;border:1px solid #ddd}.score-ribbon{page-break-inside:avoid}.persona-table{font-size:7pt}@page{size:A4;margin:15mm 12mm}}
+    </style>
+</head>
+<body>
+<header class="site-header"><a class="brand" href="/admin/orders">Admin</a><a class="header-link" th:href="@{/admin/orders/{id}(id=${order.id})}">← 주문 상세</a></header>
+
+<main class="page report">
+    <!-- 1. 상단 제목 -->
+    <div class="rpt-header">
+        <h1 th:text="${order.project_name}">프로젝트명</h1>
+        <p class="subtitle">가상 고객 <span th:text="${report.response_count}"></span>명 반응 분석</p>
+        <div class="meta-row">
+            <span>응답 <span th:text="${report.response_count}"></span>명</span>
+            <span>분석 유형: <span th:text="${order.target_type}"></span></span>
+            <span th:if="${reportDate}">생성일: <span th:text="${reportDate}"></span></span>
+        </div>
+    </div>
+
+    <!-- 2. 한눈에 보는 결론 -->
+    <div class="conclusion-box" th:if="${report.executive_summary}">
+        <h2>한눈에 보는 결론</h2>
+        <div th:text="${report.executive_summary}"></div>
+    </div>
+
+    <!-- 3. 핵심 점수 -->
+    <div class="score-ribbon">
+        <div class="score-card">
+            <span class="status" th:classappend="'st-' + (${purchaseStatus == '좋음'} ? 'good' : (${purchaseStatus == '보통'} ? 'ok' : (${purchaseStatus == '주의'} ? 'warn' : 'bad')))" th:text="${purchaseStatus}"></span>
+            <div class="val" th:text="${purchaseIntentScore}" style="color:var(--blue)">-</div>
+            <div class="lbl">구매 의향</div>
+            <div class="desc" th:text="${purchaseDesc}"></div>
+        </div>
+        <div class="score-card">
+            <span class="status" th:classappend="'st-' + (${fitStatus == '좋음'} ? 'good' : (${fitStatus == '보통'} ? 'ok' : (${fitStatus == '주의'} ? 'warn' : 'bad')))" th:text="${fitStatus}"></span>
+            <div class="val" th:text="${targetFitScore}" style="color:#7c3aed">-</div>
+            <div class="lbl">고객 적합도</div>
+            <div class="desc" th:text="${fitDesc}"></div>
+        </div>
+        <div class="score-card">
+            <span class="status" th:classappend="'st-' + (${priceStatus == '좋음'} ? 'good' : (${priceStatus == '보통'} ? 'ok' : (${priceStatus == '주의'} ? 'warn' : 'bad')))" th:text="${priceStatus}"></span>
+            <div class="val" th:text="${priceScore}" style="color:#0891b2">-</div>
+            <div class="lbl">가격 수용도</div>
+            <div class="desc" th:text="${priceDesc}"></div>
+        </div>
+        <div class="score-card">
+            <span class="status" th:classappend="'st-' + (${trustStatus == '좋음'} ? 'good' : (${trustStatus == '보통'} ? 'ok' : (${trustStatus == '주의'} ? 'warn' : 'bad')))" th:text="${trustStatus}"></span>
+            <div class="val" th:text="${trustScore}" style="color:#ea580c">-</div>
+            <div class="lbl">신뢰도</div>
+            <div class="desc" th:text="${trustDesc}"></div>
+        </div>
+        <div class="score-card">
+            <span class="status" th:classappend="'st-' + (${clarityStatus == '좋음'} ? 'good' : (${clarityStatus == '보통'} ? 'ok' : (${clarityStatus == '주의'} ? 'warn' : 'bad')))" th:text="${clarityStatus}"></span>
+            <div class="val" th:text="${clarityScore}" style="color:var(--green)">-</div>
+            <div class="lbl">설명 이해도</div>
+            <div class="desc" th:text="${clarityDesc}"></div>
+        </div>
+    </div>
+
+    <!-- 4. 전체 반응 요약 (차트 2개) -->
+    <div class="charts-row">
+        <div class="chart-box">
+            <h3>핵심 점수 비교</h3>
+            <canvas id="radarChart"></canvas>
+            <div class="chart-note" th:if="${highestScore != null}">
+                가장 높은 항목은 <strong th:text="${highestScore}"></strong>,
+                가장 낮은 항목은 <strong th:text="${lowestScore}"></strong>입니다.
+            </div>
+        </div>
+        <div class="chart-box">
+            <h3>전체 반응 비율</h3>
+            <canvas id="sentimentChart"></canvas>
+            <div class="chart-note" th:if="${sentiments != null && !sentiments.isEmpty()}">
+                <span th:each="s,iter : ${sentiments}"><span th:text="${s.sentiment}"></span> <span th:text="${s.cnt}"></span>명<span th:if="!${iter.last}">, </span></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. 고객군별 반응 -->
+    <div class="section" th:if="${segments != null && !segments.isEmpty()}">
+        <h2>고객군별 반응</h2>
+        <table class="summary-table">
+            <thead><tr><th>고객군</th><th>인원</th><th>구매 의향</th><th>고객 적합도</th><th>가격 수용도</th><th>신뢰도</th></tr></thead>
+            <tbody>
+                <tr th:each="s : ${segments}">
+                    <td><span class="badge" th:classappend="${s.selection_group == '핵심 타겟'} ? 'bg-core' : (${s.selection_group == '인접 타겟'} ? 'bg-adjacent' : (${s.selection_group == '신뢰/가격 회의'} ? 'bg-skeptic' : (${s.selection_group == '저적합 대조군'} ? 'bg-low' : 'bg-random')))" th:text="${s.selection_group}"></span></td>
+                    <td th:text="${s.cnt}"></td>
+                    <td th:text="${s.avg_purchase}"></td><td th:text="${s.avg_fit}"></td><td th:text="${s.avg_price}"></td><td th:text="${s.avg_trust}"></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 6. 최종 판단 + 분석 내용 -->
+    <div class="section" th:if="${report.final_verdict}"><h2>최종 판단</h2><div class="content" th:text="${report.final_verdict}"></div></div>
+    <div class="section" th:if="${report.purchase_intent_summary}"><h2>구매 가능성</h2><div class="content" th:text="${report.purchase_intent_summary}"></div></div>
+    <div class="section" th:if="${report.price_summary}"><h2>가격에 대한 반응</h2><div class="content" th:text="${report.price_summary}"></div></div>
+    <div class="section" th:if="${report.trust_summary}"><h2>신뢰를 느낀 부분과 부족한 부분</h2><div class="content" th:text="${report.trust_summary}"></div></div>
+    <div class="section" th:if="${report.target_validation_summary}"><h2>잘 맞는 고객 확인</h2><div class="content" th:text="${report.target_validation_summary}"></div></div>
+    <div class="section" th:if="${report.segment_summary}"><h2>고객군별 반응 분석</h2><div class="content" th:text="${report.segment_summary}"></div></div>
+    <div class="section" th:if="${report.improvement_summary}">
+        <h2>고쳐야 할 부분</h2><div class="content" th:text="${report.improvement_summary}"></div>
+        <div class="takeaway"><strong>핵심 정리</strong>위 개선 항목 중 가장 효과가 크고 수정이 쉬운 것부터 먼저 실행하세요.</div>
+    </div>
+    <div class="section" th:if="${report.risk_summary}"><h2>주의할 점</h2><div class="content" th:text="${report.risk_summary}"></div></div>
+
+    <!-- 가상 고객별 반응 표 (검색/필터 포함) -->
+    <div class="section">
+        <h2>가상 고객별 반응 (<span th:text="${#lists.size(reactions)}"></span>명)</h2>
+        <div class="filter-row">
+            <input type="text" id="personaSearch" placeholder="검색어 (연령, 지역, 직업 등)" oninput="filterPersonas()" style="min-width:200px">
+            <select id="segmentFilter" onchange="filterPersonas()"><option value="">전체 고객군</option><option th:each="s : ${segments}" th:value="${s.selection_group}" th:text="${s.selection_group}"></option></select>
+            <select id="sentimentFilter" onchange="filterPersonas()"><option value="">전체 반응</option><option value="긍정">긍정</option><option value="중립">중립</option><option value="부정">부정</option><option value="복합">복합</option></select>
+        </div>
+        <div style="overflow-x:auto">
+        <table class="persona-table" id="personaTable">
+            <thead><tr><th>가상 고객</th><th>연령</th><th>지역</th><th>직업</th><th>고객군</th><th>반응</th><th>구매<br>의향</th><th>고객<br>적합</th><th>가격<br>수용</th><th>신뢰</th><th></th></tr></thead>
+            <tbody>
+                <tr th:each="r : ${reactions}" th:attr="data-segment=${r.selection_group},data-sentiment=${r.sentiment}">
+                    <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" th:text="${r.segment_label}" th:attr="title=${r.segment_label}"></td>
+                    <td th:text="${r.age_group}"></td><td th:text="${r.region}"></td><td th:text="${r.occupation}"></td>
+                    <td><span class="badge" th:classappend="${r.selection_group == '핵심 타겟'} ? 'bg-core' : (${r.selection_group == '인접 타겟'} ? 'bg-adjacent' : (${r.selection_group == '신뢰/가격 회의'} ? 'bg-skeptic' : (${r.selection_group == '저적합 대조군'} ? 'bg-low' : 'bg-random')))" th:text="${r.selection_group}"></span></td>
+                    <td><span th:classappend="${r.sentiment == '긍정'} ? 'sent-pos' : (${r.sentiment == '부정'} ? 'sent-neg' : (${r.sentiment == '복합'} ? 'sent-mix' : 'sent-neu'))" th:text="${r.sentiment}"></span></td>
+                    <td th:text="${r.purchase_intent_score}"></td><td th:text="${r.target_fit_score}"></td><td th:text="${r.price_acceptance_score}"></td><td th:text="${r.trust_score}"></td>
+                    <td><a th:href="@{/admin/reports/{oid}/personas/{rid}(oid=${order.id},rid=${r.id})}" style="color:var(--blue);font-weight:600;text-decoration:none;font-size:0.78rem">자세히</a></td>
+                </tr>
+            </tbody>
+        </table>
+        </div>
+    </div>
+
+    <!-- 분석 기준과 주의 문구 -->
+    <div class="disclaimer">
+        이 분석 결과는 AI 기반 가상 고객 시뮬레이션이며, 실제 소비자 조사가 아닙니다. 결과나 성과를 보장하지 않습니다.<br>
+        분석 모델: <span th:text="${report.model_name}"></span> · 리포트 v<span th:text="${report.report_version}"></span> · 응답 <span th:text="${report.response_count}"></span>명
+    </div>
+
+    <script id="chart-data" type="application/json" th:attr="data-scores=${scoresJson},data-sentiments=${sentimentsJson}"></script>
+</main>
+
+<script>
+(function(){var d=document.getElementById('chart-data');var scores=JSON.parse(d.getAttribute('data-scores')||'[0,0,0,0,0]');var sent=JSON.parse(d.getAttribute('data-sentiments')||'[]');
+new Chart(document.getElementById('radarChart'),{type:'radar',data:{labels:['구매 의향','고객 적합도','가격 수용도','신뢰도','설명 이해도'],datasets:[{label:'종합 점수',data:scores,backgroundColor:'rgba(37,99,235,0.1)',borderColor:'#2563eb',borderWidth:2,pointBackgroundColor:'#2563eb',pointRadius:4}]},options:{responsive:!0,scales:{r:{beginAtZero:!0,max:100,ticks:{stepSize:20}}},plugins:{legend:{display:!1}}}});
+var stl=[],std=[];sent.forEach(function(s){stl.push(s.sentiment);std.push(Number(s.cnt))});new Chart(document.getElementById('sentimentChart'),{type:'doughnut',data:{labels:stl,datasets:[{data:std,backgroundColor:['#059669','#d97706','#dc2626','#6b7280'],borderWidth:0}]},options:{responsive:!0,plugins:{legend:{position:'bottom',labels:{font:{size:11}}}}}});
+})();
+
+function filterPersonas(){
+    var q=(document.getElementById('personaSearch').value||'').toLowerCase();
+    var seg=document.getElementById('segmentFilter').value;
+    var sent=document.getElementById('sentimentFilter').value;
+    document.querySelectorAll('#personaTable tbody tr').forEach(function(tr){
+        var text=(tr.textContent||'').toLowerCase();
+        var matchQ=!q||text.includes(q);
+        var matchSeg=!seg||tr.getAttribute('data-segment')===seg;
+        var matchSent=!sent||tr.getAttribute('data-sentiment')===sent;
+        tr.style.display=matchQ&&matchSeg&&matchSent?'':'none';
+    });
+}
+</script>
+</body>
+</html>

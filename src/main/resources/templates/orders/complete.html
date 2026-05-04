@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>신청 완료</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<header class="site-header">
+    <a class="brand" href="/">CustomerPreview</a>
+    <a class="header-link" href="/">처음으로</a>
+</header>
+
+<main class="page narrow">
+    <div class="completion">
+        <p class="eyebrow">신청 완료</p>
+        <h1>신청이 완료되었습니다.</h1>
+        <p class="lead">신청이 완료되었습니다. 베타 기간에는 입금 확인 후 리포트가 생성됩니다.</p>
+        <div class="summary-box">
+            <p><strong>신청 번호</strong> <span th:text="${order.id}"></span></p>
+            <p><strong>베타 가격</strong> 9,900원</p>
+            <p><strong>신청 항목</strong> <span th:text="${order.projectName}"></span></p>
+        </div>
+        <p>입금 확인 후 순차적으로 AI 기반 가상고객 시뮬레이션 리포트를 생성합니다.</p>
+        <p>개인정보, 고객 DB, 매출자료, 계약서, 내부 기획자료, 병원·금융·법률 등 민감정보를 입력한 경우 별도로 연락해 주세요.</p>
+        <a class="button secondary" href="/">서비스 소개로 돌아가기</a>
+    </div>
+</main>
+</body>
+</html>

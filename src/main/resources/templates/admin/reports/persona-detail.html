@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>가상 고객 반응 상세</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+    <style>
+        :root{--blue:#2563eb;--slate:#1e293b;--gray:#64748b;--border:#e2e8f0;--surface:#f8fafc}
+        .persona-detail{max-width:860px;margin:0 auto}
+        .persona-header{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px}
+        .card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:24px}
+        .card h2{font-size:1.05rem;margin:0 0 14px;color:var(--slate)}
+        .profile-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;font-size:0.85rem}
+        .profile-grid dt{color:var(--gray);font-weight:500}.profile-grid dd{font-weight:600;color:var(--slate);margin:0 0 6px}
+        .score-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+        .score-cell{text-align:center;padding:10px 6px;border-radius:8px;background:var(--surface)}
+        .score-cell .val{font-size:1.15rem;font-weight:800}.score-cell .lbl{font-size:0.7rem;color:var(--gray);margin-top:2px}
+        .section{background:#fff;border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:14px}
+        .section h3{font-size:0.95rem;font-weight:700;color:var(--slate);margin:0 0 12px}
+        .section p,.section li{font-size:0.88rem;line-height:1.75;color:#334155}
+        .quote-block{background:#f1f5f9;border-left:3px solid var(--blue);padding:14px 18px;border-radius:0 8px 8px 0;font-style:italic;margin:8px 0;font-size:0.9rem;line-height:1.7}
+        .tag-list{display:flex;flex-wrap:wrap;gap:6px}
+        .tag{background:#dbeafe;color:#1e40af;padding:3px 10px;border-radius:4px;font-size:0.8rem;font-weight:500}
+        .tag-red{background:#fee2e2;color:#991b1b}.tag-green{background:#d1fae5;color:#065f46}.tag-amber{background:#fef3c7;color:#92400e}
+    </style>
+</head>
+<body>
+<header class="site-header">
+    <a class="brand" href="/admin/orders">Admin</a>
+    <a class="header-link" th:href="@{/admin/reports/{id}(id=${order.id})}">← 분석 결과로</a>
+</header>
+
+<main class="page persona-detail">
+    <!-- 1. 이 고객은 어떤 사람인가 -->
+    <div class="persona-header">
+        <div class="card">
+            <h2 th:text="${reaction.segment_label}">가상 고객</h2>
+            <dl class="profile-grid">
+                <dt>연령</dt><dd th:text="${reaction.age_group} + ' / ' + ${reaction.gender}"></dd>
+                <dt>지역</dt><dd th:text="${reaction.region}"></dd>
+                <dt>직업</dt><dd th:text="${reaction.occupation}"></dd>
+                <dt>고객군</dt><dd th:text="${reaction.selection_group}"></dd>
+                <dt>판단</dt><dd th:text="${reaction.decision_status}"></dd>
+                <dt>전체 반응</dt><dd th:text="${reaction.sentiment}"></dd>
+            </dl>
+        </div>
+        <!-- 2. 점수 요약 -->
+        <div class="card">
+            <h2>점수 요약</h2>
+            <div class="score-grid">
+                <div class="score-cell"><div class="val" th:text="${reaction.purchase_intent_score}" style="color:var(--blue)"></div><div class="lbl">구매 의향</div></div>
+                <div class="score-cell"><div class="val" th:text="${reaction.target_fit_score}" style="color:#7c3aed"></div><div class="lbl">고객 적합</div></div>
+                <div class="score-cell"><div class="val" th:text="${reaction.price_acceptance_score}" style="color:#0891b2"></div><div class="lbl">가격 수용</div></div>
+                <div class="score-cell"><div class="val" th:text="${reaction.trust_score}" style="color:#ea580c"></div><div class="lbl">신뢰도</div></div>
+                <div class="score-cell"><div class="val" th:text="${reaction.detail_page_clarity_score}" style="color:#059669"></div><div class="lbl">설명 이해</div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. 대표 발언 -->
+    <div class="section" th:if="${reaction.representative_quote}">
+        <h3>대표 발언</h3>
+        <div class="quote-block" th:text="${reaction.representative_quote}"></div>
+    </div>
+
+    <!-- 4. 첫인상 -->
+    <div class="section" th:if="${reaction.first_impression}">
+        <h3>첫인상</h3>
+        <p th:text="${reaction.first_impression}"></p>
+    </div>
+
+    <!-- 5. 마음에 든 점 -->
+    <div class="section" th:if="${reaction.positive_points != null}">
+        <h3>마음에 든 점</h3>
+        <div class="tag-list"><span class="tag tag-green" th:each="p : ${reaction.positive_points}" th:text="${p}"></span></div>
+    </div>
+
+    <!-- 6. 걱정되는 점 -->
+    <div class="section" th:if="${reaction.concerns != null}">
+        <h3>걱정되는 점</h3>
+        <div class="tag-list"><span class="tag tag-red" th:each="c : ${reaction.concerns}" th:text="${c}"></span></div>
+    </div>
+
+    <!-- 7. 구매를 망설이는 이유 -->
+    <div class="section" th:if="${reaction.purchase_barriers != null}">
+        <h3>구매를 망설이는 이유</h3>
+        <div class="tag-list"><span class="tag tag-amber" th:each="b : ${reaction.purchase_barriers}" th:text="${b}"></span></div>
+    </div>
+
+    <!-- 8. 가격에 대한 생각 -->
+    <div class="section" th:if="${reaction.price_reaction}">
+        <h3>가격에 대한 생각</h3>
+        <p th:text="${reaction.price_reaction}"></p>
+    </div>
+
+    <!-- 9. 신뢰를 느끼는 부분과 부족한 부분 -->
+    <div class="section" th:if="${reaction.trust_review_reaction}">
+        <h3>신뢰를 느끼는 부분과 부족한 부분</h3>
+        <p th:text="${reaction.trust_review_reaction}"></p>
+    </div>
+
+    <!-- 10. 상세페이지에서 고쳐야 할 점 -->
+    <div class="section" th:if="${reaction.detail_page_feedback}">
+        <h3>상세페이지에 대한 의견</h3>
+        <p th:text="${reaction.detail_page_feedback}"></p>
+    </div>
+
+    <!-- 11. 예상 반응 -->
+    <div class="section" th:if="${reaction.likely_reaction}">
+        <h3>전체 반응</h3>
+        <p th:text="${reaction.likely_reaction}"></p>
+    </div>
+
+    <!-- 12. 이 고객을 설득하려면 -->
+    <div class="section" th:if="${reaction.recommended_detail_page_fixes != null}">
+        <h3>이 고객을 설득하기 위한 개선사항</h3>
+        <ul><li th:each="f : ${reaction.recommended_detail_page_fixes}" th:text="${f}"></li></ul>
+    </div>
+</main>
+</body>
+</html>

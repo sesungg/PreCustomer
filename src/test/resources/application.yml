@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: precustomer-test
+  datasource:
+    url: jdbc:h2:mem:precustomer-test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        format_sql: false
+    open-in-view: false
+  thymeleaf:
+    cache: false
+
+app:
+  ai:
+    provider: mock
+  persona:
+    import-enabled: false
+    sample-import-enabled: false
+    import-path: ./data/personas.full.jsonl
+    import-batch-size: 3000
+    import-source: NEMOTRON
+  deepseek:
+    base-url: https://api.deepseek.com
+    model: deepseek-v4-flash
+    api-key: ${DEEPSEEK_API_KEY:}
+    temperature: 0.4
+    max-tokens: 6000

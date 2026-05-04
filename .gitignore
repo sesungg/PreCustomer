@@ -1,0 +1,15 @@
+.env.local
+.env
+*.log
+build/
+.gradle/
+.idea/
+uploads/*
+!uploads/.gitkeep
+.omc/
+.omx/
+data/personas.full.jsonl
+data/personas.bulk-test.jsonl
+.DS_Store
+*.pyc
+__pycache__/
