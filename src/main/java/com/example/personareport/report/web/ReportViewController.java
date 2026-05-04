@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 
+/** 리포트 상세 화면 및 개별 가상고객 반응 상세 화면. */
 @Controller
 @RequestMapping("/admin/reports")
 @RequiredArgsConstructor
@@ -41,6 +42,7 @@ public class ReportViewController {
         return map.getOrDefault(key, key);
     }
 
+    /** 리포트 상세 페이지. 종합 점수, Chart.js 차트, 분석 섹션, 가상고객 반응 표 렌더링. */
     @GetMapping("/{orderId}")
     public String viewReport(@PathVariable Long orderId, Model model) {
         var reports = reportDataService.findReportByOrderId(orderId);
@@ -135,6 +137,7 @@ public class ReportViewController {
         return "admin/reports/detail";
     }
 
+    /** 개별 가상고객 반응 상세 페이지. 인구통계, 점수, 서술형 반응, 개선 제안. */
     @GetMapping("/{orderId}/personas/{reactionId}")
     public String viewPersona(@PathVariable Long orderId, @PathVariable Long reactionId, Model model) {
         var reactions = reportDataService.findReactionById(reactionId);

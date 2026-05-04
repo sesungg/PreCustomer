@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
+/** 관리자 주문 관리 화면. 주문 목록, 상세, 입금확인, 리포트생성, 진행상황 폴링. */
 @Controller
 @RequestMapping("/admin/orders")
 @RequiredArgsConstructor
@@ -33,6 +34,7 @@ public class AdminOrderController {
     private final PipelineProgressService progressService;
     private final ReportDataService reportDataService;
 
+    /** 주문 목록 페이지. status 파라미터로 필터링 가능. */
     @GetMapping
     public String list(@RequestParam(required = false) OrderStatus status, Model model) {
         model.addAttribute("orders", orderService.findOrders(status));
@@ -41,6 +43,7 @@ public class AdminOrderController {
         return "admin/orders/list";
     }
 
+    /** 주문 상세 페이지. 진행상황, 업로드 이미지, 리포트 존재 여부 표시. */
     @GetMapping("/{id}")
     public String detail(@PathVariable Long id, Model model) {
         var order = orderService.getOrder(id);
@@ -59,6 +62,7 @@ public class AdminOrderController {
         return "redirect:/admin/orders/" + id;
     }
 
+    /** 비동기 리포트 생성 시작. 즉시 응답 후 백그라운드 실행. */
     @PostMapping("/{id}/generate")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> generate(@PathVariable Long id) {
@@ -69,6 +73,7 @@ public class AdminOrderController {
         return ResponseEntity.ok(Map.of("status", "started", "orderId", id));
     }
 
+    /** 리포트 생성 진행상황 폴링 API. JS에서 2초 간격으로 호출. */
     @GetMapping("/{id}/progress")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> getProgress(@PathVariable Long id) {
