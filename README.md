@@ -119,17 +119,62 @@ H2 콘솔: `http://localhost:8080/h2-console` (JDBC URL: `jdbc:h2:mem:precustome
 
 ---
 
-## 페르소나 데이터 적재
+## 페르소나 데이터 파이프라인
+
+### 1. 원본 데이터
+
+NVIDIA NEMOTRON 기반 한국형 가상고객 페르소나 데이터 100만 건을 사용합니다. 각 페르소나는 연령, 성별, 지역, 직업, 관심사, 소비 성향, 생활 맥락 등의 정보를 포함합니다.
+
+### 2. 데이터 준비
 
 ```bash
-# Parquet → JSONL 변환
-pip install pandas pyarrow
-python scripts/data_prepare/inspect_parquet.py /path/to/nemotron_personas_korea.parquet --rows 5
+# Parquet → JSONL 변환 (100만 건)
 python scripts/data_prepare/convert_nemotron_personas.py /path/to/nemotron_personas_korea.parquet ./data/personas.full.jsonl --limit 1000000
 
-# 대량 import (PostgreSQL 필수, H2 불가)
+# 생활 맥락, 직업, 텍스트 정규화
+python scripts/data_prepare/normalize_persona_context_v2.py ...
+```
+
+### 3. DeepSeek 라벨링 → 머신러닝 점수 예측
+
+먼저 페르소나 3,000건을 샘플링하여 **DeepSeek V4 Flash**로 분석, 10가지 소비 성향 지표에 점수를 할당합니다.
+
+| 지표 | 설명 |
+| ---- | ---- |
+| 디지털 친숙도 | 디지털 서비스/앱 사용에 익숙한 정도 |
+| 가격 민감도 | 가격, 가성비에 민감한 정도 |
+| 신뢰 민감도 | 후기, 검증, 인증을 중요하게 보는 정도 |
+| 편리함 중시도 | 시간 절약, 편의성을 중요하게 보는 정도 |
+| 품질 중시도 | 품질, 전문성, 완성도를 중시하는 정도 |
+| 새로움 선호도 | 새로운 서비스/상품에 열려 있는 정도 |
+| 지역 선호도 | 동네, 지역, 오프라인 상권에 반응할 가능성 |
+| 가족 의견 영향도 | 가족 관련 의사결정 영향도 |
+| 건강/안전 민감도 | 건강, 안전, 위생에 민감한 정도 |
+| 후기 의존도 | 후기, 평판, 추천에 의존하는 정도 |
+
+DeepSeek이 라벨링한 3,000건을 학습 데이터로 ML 모델을 훈련하고, 나머지 약 **997,000건**의 페르소나에 대해 10가지 성향 점수를 예측합니다.
+
+```bash
+python scripts/ml/deepseek_label_personas.py --sample-size 3000
+python scripts/ml/train_persona_score_model_v2.py
+python scripts/ml/predict_persona_scores.py
+```
+
+### 4. 대량 import
+
+```bash
+# PostgreSQL 필수 (H2 불가)
 ./gradlew bootRun --args='--app.persona.import-enabled=true --app.persona.import-path=./data/personas.full.jsonl'
 ```
+
+### 5. 리포트 요청 시 페르소나 선별 기준
+
+리포트 요청이 들어오면 100만 건의 페르소나 풀에서 다음 기준으로 **30명**을 선별합니다.
+
+1. **적합도 점수 계산**: 주문의 타겟 유형(SAAS, 스마트스토어, 전자책 등)과 페르소나의 직업, 연령대, 관심사, 구매 민감도를 비교하여 적합도 점수 산출
+2. **계층화 샘플링**: 직업군별로 그룹화한 후 그룹별 비례 할당으로 다양성 보장
+3. **관점 다양성 확보**: 적합도 상위 50% (핵심 타겟) + 중간 30% (인접 타겟) + 하위 20% (회의적 타겟)로 구성하여 긍정/부정/중립 시각을 균형 있게 확보
+4. **NEMOTRON 우선, SEED 보충**: ML 점수가 있는 NEMOTRON 페르소나를 우선 사용, 부족 시 SEED 페르소나로 보충
 
 ---
 
