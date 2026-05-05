@@ -1,5 +1,6 @@
 package com.example.personareport.report.service;
 
+import com.example.personareport.order.service.OrderService;
 import com.example.personareport.report.domain.PipelineProgress;
 import com.example.personareport.report.pipeline.PipelineJavaService;
 import java.io.BufferedReader;
@@ -23,6 +24,7 @@ public class ReportPipelineService {
 
     private final PipelineProgressService progressService;
     private final PipelineJavaService pipelineJava;
+    private final OrderService orderService;
 
     @Value("${app.pipeline.scripts-dir:/Users/ssg/dev/datasets/scripts}")
     private String scriptsDirPath;
@@ -91,12 +93,14 @@ public class ReportPipelineService {
 
             progress.complete();
             progressService.save(progress);
+            orderService.markCompleted(orderId);
             log.info("파이프라인 전체 완료 orderId={}", orderId);
 
         } catch (Exception e) {
             log.error("파이프라인 예외 orderId={}: {}", orderId, e.getMessage(), e);
             progress.fail(e.getMessage());
             progressService.save(progress);
+            orderService.markFailed(orderId);
         }
     }
 

@@ -90,4 +90,12 @@ public class OrderService {
         order.markFailed();
         return order;
     }
+
+    /** 주문 상태를 COMPLETED로 변경한다. (리포트 생성 완료 시 호출) */
+    @Transactional
+    public ReactionReportOrder markCompleted(Long id) {
+        ReactionReportOrder order = getOrder(id);
+        order.markCompleted();
+        return order;
+    }
 }
