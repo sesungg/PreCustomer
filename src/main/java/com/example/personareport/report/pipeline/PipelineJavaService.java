@@ -133,6 +133,7 @@ public class PipelineJavaService {
         var order = jdbc.queryForMap("SELECT * FROM report_order WHERE id = ?", orderId);
         String auth = "Bearer " + System.getenv("DEEPSEEK_API_KEY");
 
+        int successCount = 0;
         for (int i = 0; i < personas.size(); i++) {
             var persona = personas.get(i);
             String prompt = String.format("""
@@ -177,11 +178,15 @@ public class PipelineJavaService {
                     str(r.get("detailPageFeedback")), str(r.get("representativeQuote")),
                     toJson(r.get("positivePoints")), toJson(r.get("concerns")),
                     toJson(r.get("purchaseBarriers")), toJson(r.get("recommendedDetailPageFixes")));
+                successCount++;
             } catch (Exception e) {
                 log.warn("Reaction generation failed for persona {}: {}", persona.get("id"), e.getMessage());
             }
         }
-        log.info("Reactions generated for {} personas, orderId={}", personas.size(), orderId);
+        if (successCount == 0 && !personas.isEmpty()) {
+            throw new RuntimeException("모든 페르소나 반응 생성 실패 (0/" + personas.size() + ")");
+        }
+        log.info("Reactions generated: {}/{} for orderId={}", successCount, personas.size(), orderId);
     }
 
     /** 30명 반응을 DeepSeek으로 종합하여 최종 진단/분석/개선제안 생성. final_report에 저장. */
@@ -192,8 +197,7 @@ public class PipelineJavaService {
             """, orderId);
 
         if (reactions.isEmpty()) {
-            log.warn("No reactions to synthesize for orderId={}", orderId);
-            return;
+            throw new RuntimeException("취합할 페르소나 반응이 없습니다. 이전 단계(반응 생성)가 실패했을 수 있습니다.");
         }
 
         // Compute aggregate scores
