@@ -9,10 +9,10 @@ spring:
       max-file-size: 10MB
       max-request-size: 50MB
 
-logging:
-  level:
-    org.thymeleaf: DEBUG
-    org.springframework.web.servlet: DEBUG
+#logging:
+#  level:
+#    org.thymeleaf: DEBUG
+#    org.springframework.web.servlet: DEBUG
 
 app:
   upload:

@@ -104,15 +104,24 @@ public class PipelineJavaService {
             }
         }
 
+        // 이전 단계에서 생성된 product_target_profile ID 조회
+        Long targetProfileId = jdbc.queryForObject(
+                "SELECT id FROM product_target_profile WHERE report_order_id = ? ORDER BY id DESC LIMIT 1",
+                Long.class, orderId);
+        if (targetProfileId == null) targetProfileId = 0L;
+
         // Save to selected_persona
         jdbc.update("DELETE FROM selected_persona WHERE report_order_id = ?", orderId);
         for (int i = 0; i < selected.size(); i++) {
             var p = selected.get(i);
             Long personaId = (Long) p.get("id");
             jdbc.update("""
-                INSERT INTO selected_persona (report_order_id, persona_profile_id, selection_rank, selection_group, relevance_score, diversity_score, final_score, selection_reason)
-                VALUES (?,?,?,?,?,?,?,?)
-                """, orderId, personaId, i + 1, "CORE_TARGET", 70.0, 60.0, 65.0, "직업군 기반 계층화 샘플링");
+                INSERT INTO selected_persona (report_order_id, target_profile_id, persona_profile_id,
+                selection_rank, selection_group, relevance_score, diversity_score, final_score,
+                selection_reason, persona_score_model_version)
+                VALUES (?,?,?,?,?,?,?,?,?,?)
+                """, orderId, targetProfileId, personaId, i + 1, "CORE_TARGET", 70.0, 60.0, 65.0,
+                "직업군 기반 계층화 샘플링", "NAVER_SHOPPING_CANDIDATE_V1");
         }
         log.info("Persona selection done: {} personas for orderId={}", selected.size(), orderId);
         return selected;
