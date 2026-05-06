@@ -86,11 +86,16 @@ public class AdminOrderController {
             ));
         }
         PipelineProgress p = opt.get();
+        long elapsedSec = 0;
+        if (p.getStepStartedAt() != null) {
+            elapsedSec = java.time.Duration.between(p.getStepStartedAt(), java.time.LocalDateTime.now()).getSeconds();
+        }
         return ResponseEntity.ok(Map.of(
                 "status", p.getStatus(), "currentStep", p.getCurrentStep(),
                 "totalSteps", p.getTotalSteps(), "currentStepName", p.getCurrentStepName(),
                 "errorMessage", p.getErrorMessage() != null ? p.getErrorMessage() : "",
-                "completed", "COMPLETED".equals(p.getStatus()) || "FAILED".equals(p.getStatus())
+                "completed", "COMPLETED".equals(p.getStatus()) || "FAILED".equals(p.getStatus()),
+                "elapsedSeconds", elapsedSec
         ));
     }
 

@@ -73,6 +73,8 @@
                  th:style="'width: ' + (${progress.totalSteps > 0 ? progress.currentStep * 100 / progress.totalSteps : 0}) + '%'"></div>
         </div>
         <p class="progress-step-name" th:text="${progress.currentStepName}"></p>
+        <p style="font-size:0.75rem;color:#94a3b8;margin-top:4px" th:if="${progress.stepStartedAt != null && progress.status == 'IN_PROGRESS'}"
+           th:text="'경과: ' + ${T(java.time.Duration).between(progress.stepStartedAt, T(java.time.LocalDateTime).now()).toSeconds()} + '초'"></p>
         <p class="progress-error" th:if="${progress.errorMessage != null}" th:text="${progress.errorMessage}"></p>
     </div>
 
@@ -174,7 +176,14 @@
 
                         if (panel) panel.style.display = 'block';
                         if (stepText) stepText.textContent = data.currentStep + '/' + data.totalSteps;
-                        if (stepName) stepName.textContent = data.currentStepName || '';
+                        if (stepName) {
+                            stepName.textContent = data.currentStepName || '';
+                            if (data.elapsedSeconds > 0) {
+                                var mins = Math.floor(data.elapsedSeconds / 60);
+                                var secs = data.elapsedSeconds % 60;
+                                stepName.textContent += '   (' + (mins > 0 ? mins + '분 ' : '') + secs + '초 경과)';
+                            }
+                        }
 
                         var pct = data.totalSteps > 0 ? (data.currentStep * 100 / data.totalSteps) : 0;
                         if (bar) {

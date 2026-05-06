@@ -35,6 +35,8 @@ public class PipelineProgress extends BaseTimeEntity {
 
     private LocalDateTime completedAt;
 
+    private LocalDateTime stepStartedAt;
+
     public static PipelineProgress start(Long orderId, int totalSteps) {
         PipelineProgress p = new PipelineProgress();
         p.orderId = orderId;
@@ -42,12 +44,14 @@ public class PipelineProgress extends BaseTimeEntity {
         p.currentStep = 0;
         p.totalSteps = totalSteps;
         p.currentStepName = "시작 중";
+        p.stepStartedAt = LocalDateTime.now();
         return p;
     }
 
     public void advanceStep(String stepName) {
         this.currentStep++;
         this.currentStepName = stepName;
+        this.stepStartedAt = LocalDateTime.now();
     }
 
     public void complete() {
