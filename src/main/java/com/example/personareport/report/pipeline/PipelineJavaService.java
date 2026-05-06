@@ -237,7 +237,7 @@ public class PipelineJavaService {
                 target_validation_summary, segment_summary, improvement_summary, risk_summary,
                 report_markdown, response_count, report_version, response_version, model_name, model_version)
                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'detail_page_report_v1','detail_page_reaction_v1','deepseek-v4-flash','v1')
-                ON CONFLICT (report_order_id, profile_version) DO UPDATE SET
+                ON CONFLICT (report_order_id, report_version) DO UPDATE SET
                 overall_purchase_intent_score=EXCLUDED.overall_purchase_intent_score,
                 final_verdict=EXCLUDED.final_verdict, executive_summary=EXCLUDED.executive_summary,
                 report_markdown=EXCLUDED.report_markdown
