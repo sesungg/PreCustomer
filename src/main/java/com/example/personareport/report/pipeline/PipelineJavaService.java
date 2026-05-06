@@ -43,18 +43,40 @@ public class PipelineJavaService {
     private final ReactionReportOrderRepository orderRepo;
 
     /**
-     * 상품 타겟 프로필 생성. 주문 정보를 DeepSeek으로 분석하여 product_target_profile에 저장.
+     * 상품 타겟 프로필 생성. Python generate_product_target_profile.py 시스템 프롬프트와 동일.
      */
     @Transactional
     public void generateTargetProfile(Long orderId) {
         var order = orderRepo.findById(orderId).orElseThrow();
-        String prompt = String.format("""
-            상품명: %s | 한 줄 소개: %s | 설명: %s | 가격: %s | 타겟: %s
-            JSON: {"productCategory":"...","productType":"...","targetSummary":"...","coreKeywords":["..."],"purchaseDrivers":["..."],"purchaseBarriers":["..."],"messageAngles":["..."]}
+        List<String> traitKeys = List.of("digital_affinity", "price_sensitivity", "trust_sensitivity",
+                "convenience_need", "quality_sensitivity", "novelty_acceptance",
+                "local_affinity", "family_decision", "health_safety", "review_dependency");
+        List<String> ageGroups = List.of("10s", "20s", "30s", "40s", "50s", "60s+");
+        List<String> genders = List.of("male", "female");
+        List<String> groups = List.of("CORE_TARGET", "ADJACENT_TARGET", "TRUST_PRICE_SKEPTIC", "LOW_FIT_CONTROL", "STRATIFIED_RANDOM");
+
+        String systemPrompt = String.format("""
+            너는 상품 상세페이지를 분석해 가상 고객 샘플링용 상품 타겟 프로필을 만드는 분류기다.
+            출력은 JSON 객체 하나만 반환한다. 마크다운 금지.
+            없는 근거를 사실처럼 만들지 마라.
+
+            selectionWeights: 아래 %d개 키를 모두 포함. 값은 0.0~2.0.
+            매우 관련 있으면 1.2~1.8, 보통이면 0.7~1.1, 거의 무관하면 0.0~0.4.
+            키: %s
+
+            demographicPriors: ageGroups(%s), genders(%s). 값은 0.5~1.5.
+
+            samplingStrategy: %s. ratio 합은 1.0.
+            기본 추천: CORE_TARGET 0.35, ADJACENT_TARGET 0.20, TRUST_PRICE_SKEPTIC 0.20, LOW_FIT_CONTROL 0.15, STRATIFIED_RANDOM 0.10.
+            """, traitKeys.size(), traitKeys, ageGroups, genders, groups);
+
+        String userPrompt = String.format("""
+            상품명: %s | 소개: %s | 설명: %s | 가격: %s | 타겟: %s
+            JSON: {"productCategory":"...","productType":"...","targetSummary":"...","coreKeywords":[],"exclusionKeywords":[],"purchaseDrivers":[],"purchaseBarriers":[],"audienceHypotheses":[{"group":"CORE_TARGET","name":"...","priority":"HIGH","description":"...","whyRelevant":"..."}],"selectionWeights":{},"demographicPriors":{"ageGroups":{},"genders":{}},"samplingStrategy":[{"group":"CORE_TARGET","ratio":0.35}],"messageAngles":[]}
             """, order.getProjectName(), na(order.getOneLineDescription()),
             na(order.getDetailDescription()), na(order.getPriceText()), na(order.getTargetCustomer()));
 
-        String content = callDeepSeek("이커머스 상품 분석 전문가. JSON만 반환.", prompt);
+        String content = callDeepSeek(systemPrompt, userPrompt);
         try {
             var r = objectMapper.readValue(content, Map.class);
             // UPSERT: 기존 레코드 있으면 삭제 후 재생성
@@ -141,17 +163,26 @@ public class PipelineJavaService {
         for (var persona : personas) {
             Long personaProfileId = (Long) persona.get("id");
             Long selectedPersonaId = (Long) persona.getOrDefault("selected_persona_id", 0L);
-            String prompt = String.format("""
-                가상 고객: 연령:%s 성별:%s 지역:%s 직업:%s 요약:%s 관심사:%s
+            String reactionPrompt = String.format("""
+                페르소나: 연령:%s 성별:%s 지역:%s 직업:%s 요약:%s 관심사:%s
                 상품:%s 소개:%s 설명:%s 가격:%s
-                JSON: {"sentiment":"POSITIVE|NEGATIVE|MIXED|NEUTRAL","purchaseIntentScore":0,...}
+                JSON: {"personaProfileId":%d,"purchaseIntentScore":0-100,"targetFitScore":0-100,"priceAcceptanceScore":0-100,"trustScore":0-100,"detailPageClarityScore":0-100,"sentiment":"POSITIVE|NEUTRAL|NEGATIVE|MIXED","decisionStatus":"BUY|CONSIDER|HESITATE|NOT_BUY","firstImpression":"...","likelyReaction":"...","priceReaction":"...","trustReviewReaction":"...","detailPageFeedback":"...","segmentLabel":"...","representativeQuote":"...","positivePoints":[],"concerns":[],"missingInformation":[],"purchaseBarriers":[],"recommendedDetailPageFixes":[],"persuasionMessages":[]}
                 """, na((String) persona.get("age_group")), na((String) persona.get("gender")),
                 na((String) persona.get("region")), na((String) persona.get("occupation")),
                 na((String) persona.get("persona_summary")), na((String) persona.get("interests")),
                 order.getProjectName(), na(order.getOneLineDescription()),
-                na(order.getDetailDescription()), na(order.getPriceText()));
+                na(order.getDetailDescription()), na(order.getPriceText()), personaProfileId);
 
-            String content = callDeepSeek("가상 고객 페르소나. JSON만 반환.", prompt);
+            String systemReactionPrompt = """
+                너는 상품 상세페이지에 대한 한국 소비자 반응을 생성하는 분석가다.
+                페르소나가 실제로 이 상세페이지를 본 것처럼 반응을 작성한다. 과하게 긍정적으로 쓰지 않는다.
+                점수는 0~100 정수다. sentiment는 POSITIVE/NEUTRAL/NEGATIVE/MIXED 중 하나다.
+                decisionStatus는 BUY/CONSIDER/HESITATE/NOT_BUY 중 하나다.
+                없는 사실을 만들지 않는다. 의학적 효과를 단정하지 않는다.
+                JSON 객체 하나만 반환한다.
+                """;
+
+            String content = callDeepSeek(systemReactionPrompt, reactionPrompt);
             try {
                 var r = objectMapper.readValue(content, Map.class);
                 reactionRepo.save(PersonaReaction.create(orderId, selectedPersonaId, personaProfileId,
