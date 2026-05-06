@@ -61,7 +61,7 @@ public class ReportPipelineService {
         // 실패했던 파이프라인이면 해당 스텝부터 재개
         int skipUntil = 0;
         if ("FAILED".equals(progress.getStatus())) {
-            skipUntil = progress.getCurrentStep(); // 실패한 스텝 번호
+            skipUntil = Math.min(progress.getCurrentStep(), totalSteps); // 실패한 스텝 번호 (totalSteps 초과 방지)
             // progress를 IN_PROGRESS로 재설정
             progress = progressService.save(PipelineProgress.start(orderId, totalSteps));
             for (int i = 0; i < skipUntil; i++) {
