@@ -54,7 +54,7 @@ public class PipelineJavaService {
             jdbc.update("""
                 INSERT INTO product_target_profile (report_order_id, product_category, product_type, product_name, target_summary, core_keywords, purchase_drivers, purchase_barriers, message_angles, profile_version, model_name, model_version)
                 VALUES (?,?,?,?,?,?::jsonb,?::jsonb,?::jsonb,?::jsonb,'product_target_profile_v1','deepseek-v4-flash','v1')
-                ON CONFLICT (report_order_id) DO UPDATE SET
+                ON CONFLICT (report_order_id, profile_version) DO UPDATE SET
                 target_summary=EXCLUDED.target_summary, core_keywords=EXCLUDED.core_keywords,
                 purchase_drivers=EXCLUDED.purchase_drivers, purchase_barriers=EXCLUDED.purchase_barriers
                 """, orderId,
@@ -237,7 +237,7 @@ public class PipelineJavaService {
                 target_validation_summary, segment_summary, improvement_summary, risk_summary,
                 report_markdown, response_count, report_version, response_version, model_name, model_version)
                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'detail_page_report_v1','detail_page_reaction_v1','deepseek-v4-flash','v1')
-                ON CONFLICT (report_order_id) DO UPDATE SET
+                ON CONFLICT (report_order_id, profile_version) DO UPDATE SET
                 overall_purchase_intent_score=EXCLUDED.overall_purchase_intent_score,
                 final_verdict=EXCLUDED.final_verdict, executive_summary=EXCLUDED.executive_summary,
                 report_markdown=EXCLUDED.report_markdown
