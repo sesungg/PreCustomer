@@ -70,7 +70,7 @@ public class ReportPipelineService {
         }
 
         try {
-            List<Map<String, Object>> personas = null;
+            final List<Map<String, Object>>[] personasHolder = new List[1];
 
             // Step 0: URL 크롤링
             runStep(progress, skipUntil, 0, "URL 페이지 크롤링 중",
@@ -98,12 +98,12 @@ public class ReportPipelineService {
 
             // Step: 페르소나 선별
             runStep(progress, skipUntil, s + 2, "페르소나 30명 선별 중",
-                    () -> personas = pipelineJava.selectPersonas(orderId, 30));
+                    () -> personasHolder[0] = pipelineJava.selectPersonas(orderId, 30));
 
             // Step: 반응 생성
             runStep(progress, skipUntil, s + 3, "페르소나 반응 생성 중", () -> {
-                if (personas == null) personas = pipelineJava.selectPersonas(orderId, 30);
-                pipelineJava.generateReactions(orderId, personas);
+                if (personasHolder[0] == null) personasHolder[0] = pipelineJava.selectPersonas(orderId, 30);
+                pipelineJava.generateReactions(orderId, personasHolder[0]);
             });
 
             // Step: 최종 리포트
