@@ -63,7 +63,8 @@ public class PipelineJavaService {
                 toJson(result.get("coreKeywords")), toJson(result.get("purchaseDrivers")),
                 toJson(result.get("purchaseBarriers")), toJson(result.get("messageAngles")));
         } catch (Exception e) {
-            log.warn("Target profile parsing failed: {}", e.getMessage());
+            log.error("Target profile generation failed: {}", e.getMessage(), e);
+            throw new RuntimeException("상품 타겟 프로필 생성 실패", e);
         }
     }
 
@@ -250,7 +251,8 @@ public class PipelineJavaService {
                 str(r.get("segmentSummary")), str(r.get("improvementSummary")),
                 str(r.get("riskSummary")), str(r.get("reportMarkdown")), reactions.size());
         } catch (Exception e) {
-            log.warn("Final report generation failed: {}", e.getMessage());
+            log.error("Final report generation failed: {}", e.getMessage(), e);
+            throw new RuntimeException("최종 리포트 생성 실패", e);
         }
     }
 
