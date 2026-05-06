@@ -1,5 +1,6 @@
 package com.example.personareport.report.service;
 
+import com.example.personareport.modules.shopping.service.ShoppingSearchService;
 import com.example.personareport.order.service.OrderService;
 import com.example.personareport.report.domain.PipelineProgress;
 import com.example.personareport.report.pipeline.PipelineJavaService;
@@ -21,11 +22,12 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class ReportPipelineService {
 
-    private static final int TOTAL_STEPS_BASE = 5; // crawl + target + select + reactions + final
+    private static final int TOTAL_STEPS_BASE = 6; // crawl + naver + target + select + reactions + final
 
     private final PipelineProgressService progressService;
     private final PipelineJavaService pipelineJava;
     private final OrderService orderService;
+    private final ShoppingSearchService shoppingService;
 
     @Value("${app.pipeline.scripts-dir:/Users/ssg/dev/datasets/scripts}")
     private String scriptsDirPath;
@@ -76,9 +78,18 @@ public class ReportPipelineService {
             runStep(progress, skipUntil, 0, "URL 페이지 크롤링 중",
                     () -> runPython("crawl_page_snapshot.py", "--order-id", orderId.toString()));
 
-            // Step 1: 이미지 분석
+            // Step 1: 네이버 쇼핑 검색 (경쟁 상품 분석)
+            runStep(progress, skipUntil, 1, "네이버 쇼핑 경쟁 상품 분석 중", () -> {
+                var order = orderService.getOrder(orderId);
+                Integer basePrice = null;
+                try { basePrice = Integer.parseInt(order.getPriceText().replaceAll("[^0-9]", "")); } catch (Exception ignored) {}
+                shoppingService.executeSearch(order.getProjectName(), order.getProjectName(), basePrice,
+                        null, null, null, null, true);
+            });
+
+            // Step 2: 이미지 분석
             if (hasImages) {
-                runStep(progress, skipUntil, 1, "이미지 분석 중 (Gemini)", () -> {
+                runStep(progress, skipUntil, 2, "이미지 분석 중 (Gemini)", () -> {
                     List<String> args = new ArrayList<>(List.of("--order-id", orderId.toString(),
                             "--provider", "gemini", "--model-version", "gemini-2.5-flash-lite"));
                     if (geminiApiKey != null && !geminiApiKey.isBlank()) {
@@ -89,8 +100,8 @@ public class ReportPipelineService {
                 });
             }
 
-            // Step numbers: crawl=0, image=1(opt), target=(1or2), persona=(2or3), reactions=(3or4), final=(4or5)
-            int s = hasImages ? 1 : 0; // offset
+            // Step numbers: crawl=0, naver=1, image=2(opt), target=s+1, persona=s+2, reactions=s+3, final=s+4
+            int s = hasImages ? 2 : 1; // offset after crawl+naver[+image]
 
             // Step: 타겟 프로필
             runStep(progress, skipUntil, s + 1, "상품 타겟 프로필 생성 중",
