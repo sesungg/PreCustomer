@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Getter
 @Entity
@@ -33,10 +35,10 @@ public class PersonaReaction {
     @Column(columnDefinition = "TEXT") private String trustReviewReaction;
     @Column(columnDefinition = "TEXT") private String detailPageFeedback;
     @Column(columnDefinition = "TEXT") private String representativeQuote;
-    @Column(columnDefinition = "jsonb") private String positivePoints;
-    @Column(columnDefinition = "jsonb") private String concerns;
-    @Column(columnDefinition = "jsonb") private String purchaseBarriers;
-    @Column(columnDefinition = "jsonb") private String recommendedDetailPageFixes;
+    @JdbcTypeCode(SqlTypes.JSON) @Column(columnDefinition = "jsonb") private String positivePoints;
+    @JdbcTypeCode(SqlTypes.JSON) @Column(columnDefinition = "jsonb") private String concerns;
+    @JdbcTypeCode(SqlTypes.JSON) @Column(columnDefinition = "jsonb") private String purchaseBarriers;
+    @JdbcTypeCode(SqlTypes.JSON) @Column(columnDefinition = "jsonb") private String recommendedDetailPageFixes;
     private String responseVersion;
     private String modelName;
     private String modelVersion;

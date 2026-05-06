@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Getter
 @Entity
@@ -19,10 +21,10 @@ public class ProductTargetProfile {
     private String productCategory;
     private String productType;
     @Column(columnDefinition = "TEXT") private String targetSummary;
-    @Column(columnDefinition = "jsonb") private String coreKeywords;
-    @Column(columnDefinition = "jsonb") private String purchaseDrivers;
-    @Column(columnDefinition = "jsonb") private String purchaseBarriers;
-    @Column(columnDefinition = "jsonb") private String messageAngles;
+    @JdbcTypeCode(SqlTypes.JSON) @Column(columnDefinition = "jsonb") private String coreKeywords;
+    @JdbcTypeCode(SqlTypes.JSON) @Column(columnDefinition = "jsonb") private String purchaseDrivers;
+    @JdbcTypeCode(SqlTypes.JSON) @Column(columnDefinition = "jsonb") private String purchaseBarriers;
+    @JdbcTypeCode(SqlTypes.JSON) @Column(columnDefinition = "jsonb") private String messageAngles;
     private String modelName;
     private String modelVersion;
 
