@@ -133,9 +133,20 @@ public class PipelineJavaService {
         var order = jdbc.queryForMap("SELECT * FROM report_order WHERE id = ?", orderId);
         String auth = "Bearer " + System.getenv("DEEPSEEK_API_KEY");
 
+        // persona_profile_id → selected_persona_id 매핑 미리 조회
+        Map<Long, Long> selectedIds = new java.util.HashMap<>();
+        var spList = jdbc.queryForList(
+                "SELECT id, persona_profile_id FROM selected_persona WHERE report_order_id = ?", orderId);
+        for (var sp : spList) {
+            Long ppId = (Long) sp.get("persona_profile_id");
+            if (ppId != null) selectedIds.put(ppId, (Long) sp.get("id"));
+        }
+
         int successCount = 0;
         for (int i = 0; i < personas.size(); i++) {
             var persona = personas.get(i);
+            Long personaProfileId = (Long) persona.get("id");
+            Long selectedPersonaId = selectedIds.getOrDefault(personaProfileId, 0L);
             String prompt = String.format("""
                 당신은 다음 가상 고객의 관점에서 상품 상세페이지를 평가합니다.
 
@@ -162,13 +173,14 @@ public class PipelineJavaService {
             try {
                 Map<String, Object> r = objectMapper.readValue(content, Map.class);
                 jdbc.update("""
-                    INSERT INTO persona_reaction (report_order_id, persona_profile_id, segment_label, selection_group, sentiment, decision_status,
+                    INSERT INTO persona_reaction (report_order_id, selected_persona_id, persona_profile_id,
+                    segment_label, selection_group, sentiment, decision_status,
                     purchase_intent_score, target_fit_score, price_acceptance_score, trust_score, detail_page_clarity_score,
                     first_impression, likely_reaction, price_reaction, trust_review_reaction, detail_page_feedback,
                     representative_quote, positive_points, concerns, purchase_barriers, recommended_detail_page_fixes,
                     response_version, model_name, model_version)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?::jsonb,?::jsonb,?::jsonb,?::jsonb,'detail_page_reaction_v1','deepseek-v4-flash','v1')
-                    """, orderId, persona.get("id"), personaLabel(persona), "CORE_TARGET",
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?::jsonb,?::jsonb,?::jsonb,?::jsonb,'detail_page_reaction_v1','deepseek-v4-flash','v1')
+                    """, orderId, selectedPersonaId, personaProfileId, personaLabel(persona), "CORE_TARGET",
                     str(r.get("sentiment")), str(r.get("decisionStatus")),
                     toInt(r.get("purchaseIntentScore")), toInt(r.get("targetFitScore")),
                     toInt(r.get("priceAcceptanceScore")), toInt(r.get("trustScore")),
