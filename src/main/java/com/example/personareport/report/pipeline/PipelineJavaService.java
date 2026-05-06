@@ -177,7 +177,8 @@ public class PipelineJavaService {
     }
 
     /**
-     * 30명 반응을 DeepSeek으로 종합하여 최종 진단/분석/개선제안 생성.
+     * 30명 반응을 DeepSeek으로 종합하여 최종 리포트 생성.
+     * Python generate_final_detail_page_report.py 시스템 프롬프트와 동일한 로직.
      */
     @Transactional
     public void generateFinalReport(Long orderId) {
@@ -193,26 +194,58 @@ public class PipelineJavaService {
         double avgTrust = reactions.stream().mapToInt(PersonaReaction::getTrustScore).average().orElse(0);
         double avgClarity = reactions.stream().mapToInt(PersonaReaction::getDetailPageClarityScore).average().orElse(0);
 
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < Math.min(reactions.size(), 10); i++) {
-            var r = reactions.get(i);
-            sb.append(String.format("%d. %s | 구매:%d 적합:%d 가격:%d 신뢰:%d\n  인상:%s\n",
-                    i + 1, r.getSegmentLabel(), r.getPurchaseIntentScore(), r.getTargetFitScore(),
-                    r.getPriceAcceptanceScore(), r.getTrustScore(), na(r.getFirstImpression())));
+        // 반응 데이터를 JSON으로 직렬화
+        List<Map<String, Object>> reactionList = new ArrayList<>();
+        for (var r : reactions) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("segment_label", r.getSegmentLabel()); m.put("selection_group", r.getSelectionGroup());
+            m.put("sentiment", r.getSentiment()); m.put("purchase_intent_score", r.getPurchaseIntentScore());
+            m.put("target_fit_score", r.getTargetFitScore()); m.put("price_acceptance_score", r.getPriceAcceptanceScore());
+            m.put("trust_score", r.getTrustScore()); m.put("first_impression", r.getFirstImpression());
+            m.put("likely_reaction", r.getLikelyReaction()); m.put("positive_points", r.getPositivePoints());
+            m.put("concerns", r.getConcerns()); m.put("recommended_fixes", r.getRecommendedDetailPageFixes());
+            reactionList.add(m);
         }
 
-        String prompt = String.format("""
-            %d명 가상고객 반응 종합. 상품:%s 가격:%s
-            평균: 구매%.1f 적합%.1f 가격%.1f 신뢰%.1f 선명%.1f
-            반응: %s
-            JSON: {"finalVerdict":"...","executiveSummary":"...","purchaseIntentSummary":"...","priceSummary":"...","trustSummary":"...","targetValidationSummary":"...","segmentSummary":"...","improvementSummary":"...","riskSummary":"...","reportMarkdown":"..."}
-            """, reactions.size(), order.getProjectName(), na(order.getPriceText()),
-                avgPurchase, avgFit, avgPrice, avgTrust, avgClarity, sb.toString());
+        String systemPrompt = """
+            너는 상세페이지에 대한 가상 고객 30명 반응을 종합해 판매자/마케터가 바로 개선에 사용할 수 있는 최종 리포트를 작성하는 분석가다.
 
-        String content = callDeepSeek("전문 이커머스 리포트 분석가. JSON만 반환.", prompt);
+            목표:
+            - 30명의 개별 반응을 단순 나열하지 말고, 구매 의향/타겟 적합성/가격 저항/신뢰 저항/상세페이지 개선점으로 종합한다.
+            - CORE_TARGET, ADJACENT_TARGET, TRUST_PRICE_SKEPTIC 등 고객군의 역할 차이를 반영한다.
+            - 판매자가 상세페이지를 어떻게 고쳐야 하는지 명확한 우선순위를 제시한다.
+
+            중요 안전 규칙:
+            - 건강보조식품, 식품, 의료 관련 상품에서는 효능이나 안전성을 단정하지 마라.
+            - "부작용이 없다", "효과가 입증됐다" 같은 단정 문장은 금지한다.
+            - 필요한 경우 "이런 정보가 상세페이지에 추가되면 신뢰를 높일 수 있다"처럼 개선 제안으로만 표현하라.
+
+            작성 규칙:
+            - 한국어로 작성한다. 과장된 광고 문구가 아니라 분석 리포트 문체로 작성한다.
+            - 숫자와 비율을 적극 활용한다.
+            - 상세페이지 개선안은 우선순위 HIGH/MEDIUM/LOW로 나눈다.
+            - 최종 판정은 STRONG, PROMISING, MIXED, WEAK, RISKY 중 하나로 한다.
+
+            JSON만 반환한다. 마크다운 코드블록을 쓰지 마라.
+            """;
+
+        String userPrompt = String.format("""
+            상품: %s | 가격: %s | 설명: %s
+            평균 점수: 구매의향 %.1f 고객적합 %.1f 가격수용 %.1f 신뢰 %.1f 선명도 %.1f (총 %d명)
+
+            개별 반응:
+            %s
+
+            JSON 형식:
+            {"finalVerdict":"STRONG|PROMISING|MIXED|WEAK|RISKY","executiveSummary":"...","targetValidationSummary":"...","purchaseIntentSummary":"...","priceSummary":"...","trustSummary":"...","segmentSummary":"...","improvementSummary":"...","riskSummary":"...","reportMarkdown":"# 최종 리포트\\n..."}
+            """,
+            order.getProjectName(), na(order.getPriceText()), na(order.getDetailDescription()),
+            avgPurchase, avgFit, avgPrice, avgTrust, avgClarity, reactions.size(),
+            toJson(reactionList));
+
+        String content = callDeepSeek(systemPrompt, userPrompt);
         try {
             var r = objectMapper.readValue(content, Map.class);
-            // UPSERT
             var existing = finalReportRepo.findFirstByReportOrderIdOrderByIdDesc(orderId);
             existing.ifPresent(f -> finalReportRepo.delete(f));
 
