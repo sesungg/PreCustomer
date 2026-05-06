@@ -8,6 +8,7 @@ import java.io.InputStreamReader;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,7 +21,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class ReportPipelineService {
 
-    private static final int TOTAL_STEPS_BASE = 4;
+    private static final int TOTAL_STEPS_BASE = 5; // crawl + target + select + reactions + final
 
     private final PipelineProgressService progressService;
     private final PipelineJavaService pipelineJava;
@@ -46,7 +47,7 @@ public class ReportPipelineService {
     @Value("${app.pipeline.db-password:postgres}")
     private String dbPassword;
 
-    /** 비동기로 전체 파이프라인 실행. 크롤링→이미지분석→타겟프로필→페르소나선별→반응생성→최종리포트. */
+    /** 비동기로 전체 파이프라인 실행 (재개 지원). 실패한 스텝부터 다시 시작한다. */
     @Async
     public void runDetailPagePipeline(Long orderId, List<Path> imagePaths) {
         boolean hasImages = imagePaths != null && !imagePaths.isEmpty();
@@ -55,41 +56,59 @@ public class ReportPipelineService {
         PipelineProgress progress = progressService.findById(orderId)
                 .orElseGet(() -> progressService.save(PipelineProgress.start(orderId, totalSteps)));
 
-        try {
-            // Step 0: URL 크롤링 (Python 유지 - requests+BeautifulSoup 의존)
-            progress.advanceStep("URL 페이지 크롤링 중");
+        // 실패했던 파이프라인이면 해당 스텝부터 재개
+        int skipUntil = 0;
+        if ("FAILED".equals(progress.getStatus())) {
+            skipUntil = progress.getCurrentStep(); // 실패한 스텝 번호
+            // progress를 IN_PROGRESS로 재설정
+            progress = progressService.save(PipelineProgress.start(orderId, totalSteps));
+            for (int i = 0; i < skipUntil; i++) {
+                progress.advanceStep("이전 단계 (건너뜀)");
+            }
             progressService.save(progress);
-            runPython("crawl_page_snapshot.py", "--order-id", orderId.toString());
+            log.info("파이프라인 재개 orderId={} from step={}", orderId, skipUntil);
+        }
 
-            // Step 1: 이미지 분석 (Python 유지 - Gemini 호출)
+        try {
+            List<Map<String, Object>> personas = null;
+
+            // Step 0: URL 크롤링
+            runStep(progress, skipUntil, 0, "URL 페이지 크롤링 중",
+                    () -> runPython("crawl_page_snapshot.py", "--order-id", orderId.toString()));
+
+            // Step 1: 이미지 분석
             if (hasImages) {
-                progress.advanceStep("이미지 분석 중 (Gemini)");
-                progressService.save(progress);
-                List<String> args = new ArrayList<>(List.of("--order-id", orderId.toString(),
-                        "--provider", "gemini", "--model-version", "gemini-2.5-flash-lite"));
-                if (geminiApiKey != null && !geminiApiKey.isBlank()) {
-                    args.add("--api-key"); args.add(geminiApiKey);
-                }
-                for (Path p : imagePaths) { args.add("--image-path"); args.add(p.toAbsolutePath().toString()); }
-                runPython("analyze_detail_page_images.py", args.toArray(new String[0]));
+                runStep(progress, skipUntil, 1, "이미지 분석 중 (Gemini)", () -> {
+                    List<String> args = new ArrayList<>(List.of("--order-id", orderId.toString(),
+                            "--provider", "gemini", "--model-version", "gemini-2.5-flash-lite"));
+                    if (geminiApiKey != null && !geminiApiKey.isBlank()) {
+                        args.add("--api-key"); args.add(geminiApiKey);
+                    }
+                    for (Path p : imagePaths) { args.add("--image-path"); args.add(p.toAbsolutePath().toString()); }
+                    runPython("analyze_detail_page_images.py", args.toArray(new String[0]));
+                });
             }
 
-            // Step 2-5: Java 파이프라인 (DeepSeek Feign Client)
-            progress.advanceStep("상품 타겟 프로필 생성 중");
-            progressService.save(progress);
-            pipelineJava.generateTargetProfile(orderId);
+            // Step numbers: crawl=0, image=1(opt), target=(1or2), persona=(2or3), reactions=(3or4), final=(4or5)
+            int s = hasImages ? 1 : 0; // offset
 
-            progress.advanceStep("페르소나 30명 선별 중");
-            progressService.save(progress);
-            var personas = pipelineJava.selectPersonas(orderId, 30);
+            // Step: 타겟 프로필
+            runStep(progress, skipUntil, s + 1, "상품 타겟 프로필 생성 중",
+                    () -> pipelineJava.generateTargetProfile(orderId));
 
-            progress.advanceStep("페르소나 반응 생성 중");
-            progressService.save(progress);
-            pipelineJava.generateReactions(orderId, personas);
+            // Step: 페르소나 선별
+            runStep(progress, skipUntil, s + 2, "페르소나 30명 선별 중",
+                    () -> personas = pipelineJava.selectPersonas(orderId, 30));
 
-            progress.advanceStep("최종 리포트 취합 중");
-            progressService.save(progress);
-            pipelineJava.generateFinalReport(orderId);
+            // Step: 반응 생성
+            runStep(progress, skipUntil, s + 3, "페르소나 반응 생성 중", () -> {
+                if (personas == null) personas = pipelineJava.selectPersonas(orderId, 30);
+                pipelineJava.generateReactions(orderId, personas);
+            });
+
+            // Step: 최종 리포트
+            runStep(progress, skipUntil, s + 4, "최종 리포트 취합 중",
+                    () -> pipelineJava.generateFinalReport(orderId));
 
             progress.complete();
             progressService.save(progress);
@@ -102,6 +121,14 @@ public class ReportPipelineService {
             progressService.save(progress);
             orderService.markFailed(orderId);
         }
+    }
+
+    /** skipUntil보다 작은 스텝은 건너뛰고, 현재 스텝이면 실행한다. */
+    private void runStep(PipelineProgress progress, int skipUntil, int stepNum, String stepName, Runnable task) {
+        if (progress.getCurrentStep() < skipUntil) return; // 이미 완료된 스텝
+        progress.advanceStep(stepName);
+        progressService.save(progress);
+        task.run();
     }
 
     private void runPython(String scriptName, String... extraArgs) {
