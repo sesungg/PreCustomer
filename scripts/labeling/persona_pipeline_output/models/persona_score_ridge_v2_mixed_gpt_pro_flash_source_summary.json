@@ -1,0 +1,36 @@
+{
+  "candidate_rows": 3564,
+  "unique_personas": 3000,
+  "by_source": {
+    "deepseek_v4_flash": {
+      "rows": 3000,
+      "unique_personas": 3000,
+      "priority": 3,
+      "source_kind": "feature_score",
+      "score_source": "DEEPSEEK_PSEUDO",
+      "score_model_version": "deepseek_v4_flash_prompt_v1",
+      "label_source": "DEEPSEEK_PSEUDO",
+      "label_batch_id": "deepseek_3000_v1"
+    },
+    "deepseek_v4_pro": {
+      "rows": 408,
+      "unique_personas": 408,
+      "priority": 2,
+      "source_kind": "label_review",
+      "score_source": "DEEPSEEK_PRO_PSEUDO",
+      "score_model_version": "deepseek_v4_pro_prompt_v2",
+      "label_source": "DEEPSEEK_PRO_PSEUDO",
+      "label_batch_id": "DeepSeek_Pro_pseudo-label_batch"
+    },
+    "gpt_5_5_xhigh": {
+      "rows": 156,
+      "unique_personas": 156,
+      "priority": 1,
+      "source_kind": "label_review",
+      "score_source": "GPT_PSEUDO",
+      "score_model_version": "gpt_5_5_xhigh_review_v1",
+      "label_source": "GPT_PSEUDO",
+      "label_batch_id": "GPT_review_v1"
+    }
+  }
+}

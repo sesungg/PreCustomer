@@ -1,6 +1,11 @@
 package com.example.personareport.report.pipeline.entity;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -10,58 +15,107 @@ import org.hibernate.type.SqlTypes;
 @Getter
 @Entity
 @Table(name = "persona_reaction")
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@NoArgsConstructor
 public class PersonaReaction {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
     @Column(name = "report_order_id", nullable = false)
     private Long reportOrderId;
+
     @Column(name = "selected_persona_id")
     private Long selectedPersonaId;
+
     @Column(name = "persona_profile_id", nullable = false)
     private Long personaProfileId;
-    private String segmentLabel;
-    private String selectionGroup;
-    private String sentiment;
-    private String decisionStatus;
-    private int purchaseIntentScore;
-    private int targetFitScore;
-    private int priceAcceptanceScore;
-    private int trustScore;
-    private int detailPageClarityScore;
-    @Column(columnDefinition = "TEXT") private String firstImpression;
-    @Column(columnDefinition = "TEXT") private String likelyReaction;
-    @Column(columnDefinition = "TEXT") private String priceReaction;
-    @Column(columnDefinition = "TEXT") private String trustReviewReaction;
-    @Column(columnDefinition = "TEXT") private String detailPageFeedback;
-    @Column(columnDefinition = "TEXT") private String representativeQuote;
-    @JdbcTypeCode(SqlTypes.JSON) @Column(columnDefinition = "jsonb") private String positivePoints;
-    @JdbcTypeCode(SqlTypes.JSON) @Column(columnDefinition = "jsonb") private String concerns;
-    @JdbcTypeCode(SqlTypes.JSON) @Column(columnDefinition = "jsonb") private String purchaseBarriers;
-    @JdbcTypeCode(SqlTypes.JSON) @Column(columnDefinition = "jsonb") private String recommendedDetailPageFixes;
+
+    @Column(name = "product_target_profile_id")
+    private Long productTargetProfileId;
+
+    @Column(name = "response_version", length = 100)
     private String responseVersion;
+
+    @Column(name = "model_name", length = 100)
     private String modelName;
+
+    @Column(name = "model_version", length = 100)
     private String modelVersion;
 
-    public static PersonaReaction create(Long orderId, Long selectedPersonaId, Long personaProfileId,
-                                         String label, String group, String sentiment, String decision,
-                                         int purchase, int fit, int price, int trust, int clarity,
-                                         String firstImpression, String likelyReaction, String priceReaction,
-                                         String trustReviewReaction, String detailPageFeedback,
-                                         String representativeQuote, String positivePoints, String concerns,
-                                         String purchaseBarriers, String fixes) {
-        var r = new PersonaReaction();
-        r.reportOrderId = orderId; r.selectedPersonaId = selectedPersonaId;
-        r.personaProfileId = personaProfileId; r.segmentLabel = label; r.selectionGroup = group;
-        r.sentiment = sentiment; r.decisionStatus = decision;
-        r.purchaseIntentScore = purchase; r.targetFitScore = fit; r.priceAcceptanceScore = price;
-        r.trustScore = trust; r.detailPageClarityScore = clarity;
-        r.firstImpression = firstImpression; r.likelyReaction = likelyReaction;
-        r.priceReaction = priceReaction; r.trustReviewReaction = trustReviewReaction;
-        r.detailPageFeedback = detailPageFeedback; r.representativeQuote = representativeQuote;
-        r.positivePoints = positivePoints; r.concerns = concerns;
-        r.purchaseBarriers = purchaseBarriers; r.recommendedDetailPageFixes = fixes;
-        r.responseVersion = "detail_page_reaction_v1"; r.modelName = "deepseek-v4-flash"; r.modelVersion = "v1";
-        return r;
-    }
+    @Column(name = "selection_group", length = 50)
+    private String selectionGroup;
+
+    @Column(name = "selection_rank")
+    private Integer selectionRank;
+
+    @Column(name = "segment_label", length = 200)
+    private String segmentLabel;
+
+    @Column(name = "sentiment", length = 30)
+    private String sentiment;
+
+    @Column(name = "decision_status", length = 50)
+    private String decisionStatus;
+
+    @Column(name = "purchase_intent_score", nullable = false)
+    private int purchaseIntentScore;
+
+    @Column(name = "target_fit_score", nullable = false)
+    private int targetFitScore;
+
+    @Column(name = "price_acceptance_score", nullable = false)
+    private int priceAcceptanceScore;
+
+    @Column(name = "trust_score", nullable = false)
+    private int trustScore;
+
+    @Column(name = "detail_page_clarity_score", nullable = false)
+    private int detailPageClarityScore;
+
+    @Column(name = "first_impression", columnDefinition = "TEXT")
+    private String firstImpression;
+
+    @Column(name = "likely_reaction", columnDefinition = "TEXT")
+    private String likelyReaction;
+
+    @Column(name = "price_reaction", columnDefinition = "TEXT")
+    private String priceReaction;
+
+    @Column(name = "trust_review_reaction", columnDefinition = "TEXT")
+    private String trustReviewReaction;
+
+    @Column(name = "detail_page_feedback", columnDefinition = "TEXT")
+    private String detailPageFeedback;
+
+    @Column(name = "representative_quote", columnDefinition = "TEXT")
+    private String representativeQuote;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "positive_points", columnDefinition = "jsonb")
+    private String positivePoints;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "concerns", columnDefinition = "jsonb")
+    private String concerns;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "missing_information", columnDefinition = "jsonb")
+    private String missingInformation;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "purchase_barriers", columnDefinition = "jsonb")
+    private String purchaseBarriers;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "persuasion_messages", columnDefinition = "jsonb")
+    private String persuasionMessages;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "recommended_detail_page_fixes", columnDefinition = "jsonb")
+    private String recommendedDetailPageFixes;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "raw_response", columnDefinition = "jsonb")
+    private String rawResponse;
 }

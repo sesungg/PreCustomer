@@ -25,4 +25,25 @@ public class PipelineProgressService {
     public PipelineProgress save(PipelineProgress progress) {
         return progressRepository.save(progress);
     }
+
+    /** 진행 중인 파이프라인에 graceful stop을 요청한다. */
+    @Transactional
+    public boolean requestStop(Long orderId) {
+        return progressRepository.findById(orderId)
+                .filter(progress -> !progress.isTerminal())
+                .map(progress -> {
+                    progress.requestStop();
+                    progressRepository.save(progress);
+                    return true;
+                })
+                .orElse(false);
+    }
+
+    /** 중지 요청 여부를 최신 DB 상태 기준으로 조회한다. */
+    @Transactional(readOnly = true)
+    public boolean isStopRequested(Long orderId) {
+        return progressRepository.findById(orderId)
+                .map(PipelineProgress::isStopRequested)
+                .orElse(false);
+    }
 }

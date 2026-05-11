@@ -38,6 +38,15 @@ public class ReportViewController {
         SENTIMENT_KO.put("NEUTRAL", "중립");
     }
 
+    private static final Map<String, String> DECISION_KO = new LinkedHashMap<>();
+    static {
+        DECISION_KO.put("BUY", "구매 의향");
+        DECISION_KO.put("CONSIDER", "고려 중");
+        DECISION_KO.put("HESITATE", "망설임");
+        DECISION_KO.put("NOT_BUY", "구매 안 함");
+        DECISION_KO.put("UNDECIDED", "미결정");
+    }
+
     private String ko(String key, Map<String, String> map) {
         return map.getOrDefault(key, key);
     }
@@ -101,19 +110,26 @@ public class ReportViewController {
         model.addAttribute("highestScore", highest);
         model.addAttribute("lowestScore", lowest);
 
+        // detail_page_summary (템플릿에 미노출 필드 보완)
+        model.addAttribute("detailPageSummary", report.get("detail_page_summary"));
+
         // 세그먼트 + 감정
         var segments = reportDataService.findSegments(orderId);
         var sentiments = reportDataService.findSentiments(orderId);
+        var decisions = reportDataService.findDecisions(orderId);
         for (var s : segments) s.put("selection_group", ko((String) s.get("selection_group"), SEGMENT_KO));
         for (var s : sentiments) s.put("sentiment", ko((String) s.get("sentiment"), SENTIMENT_KO));
+        for (var d : decisions) d.put("decision_status", ko((String) d.get("decision_status"), DECISION_KO));
         model.addAttribute("segments", segments);
         model.addAttribute("sentiments", sentiments);
+        model.addAttribute("decisions", decisions);
 
         // 페르소나 반응
         var reactions = reportDataService.findReactions(orderId);
         for (var r : reactions) {
             r.put("selection_group", ko((String) r.get("selection_group"), SEGMENT_KO));
             r.put("sentiment", ko((String) r.get("sentiment"), SENTIMENT_KO));
+            r.put("decision_status", ko((String) r.get("decision_status"), DECISION_KO));
         }
         model.addAttribute("reactions", reactions);
 
@@ -121,6 +137,7 @@ public class ReportViewController {
         try {
             model.addAttribute("segmentsJson", objectMapper.writeValueAsString(segments));
             model.addAttribute("sentimentsJson", objectMapper.writeValueAsString(sentiments));
+            model.addAttribute("decisionsJson", objectMapper.writeValueAsString(decisions));
             model.addAttribute("scoresJson", objectMapper.writeValueAsString(java.util.List.of(
                     toInt(report.get("overall_purchase_intent_score")),
                     toInt(report.get("overall_target_fit_score")),
@@ -131,6 +148,7 @@ public class ReportViewController {
         } catch (Exception e) {
             model.addAttribute("segmentsJson", "[]");
             model.addAttribute("sentimentsJson", "[]");
+            model.addAttribute("decisionsJson", "[]");
             model.addAttribute("scoresJson", "[]");
         }
 

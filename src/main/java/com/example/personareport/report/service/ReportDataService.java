@@ -75,6 +75,14 @@ public class ReportDataService {
                 """, orderId);
     }
 
+    /** 구매 결정 상태 분포 (BUY/CONSIDER/HESITATE/NOT_BUY/UNDECIDED). */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> findDecisions(Long orderId) {
+        return jdbc.queryForList(
+                "SELECT decision_status, COUNT(*) as cnt FROM persona_reaction WHERE report_order_id = ? GROUP BY decision_status ORDER BY cnt DESC",
+                orderId);
+    }
+
     /** 개별 페르소나 반응 상세. */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> findReactionById(Long reactionId) {

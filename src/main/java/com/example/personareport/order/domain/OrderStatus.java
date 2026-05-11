@@ -8,6 +8,7 @@ public enum OrderStatus {
     PAID("입금 확인"),
     GENERATING("리포트 생성 중"),
     COMPLETED("리포트 완료"),
+    STOPPED("생성 중지"),
     FAILED("실패");
 
     private final String label;

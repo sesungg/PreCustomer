@@ -1,57 +1,108 @@
 package com.example.personareport.report.pipeline.entity;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Getter
 @Entity
 @Table(name = "final_report")
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@NoArgsConstructor
 public class FinalReport {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
     @Column(name = "report_order_id", nullable = false)
     private Long reportOrderId;
-    private String reportVersion;
-    private String responseVersion;
-    private String modelName;
-    private String modelVersion;
-    private int responseCount;
-    private int overallPurchaseIntentScore;
-    private int overallTargetFitScore;
-    private int overallPriceAcceptanceScore;
-    private int overallTrustScore;
-    private int overallDetailPageClarityScore;
-    @Column(columnDefinition = "TEXT") private String finalVerdict;
-    @Column(columnDefinition = "TEXT") private String executiveSummary;
-    @Column(columnDefinition = "TEXT") private String purchaseIntentSummary;
-    @Column(columnDefinition = "TEXT") private String priceSummary;
-    @Column(columnDefinition = "TEXT") private String trustSummary;
-    @Column(columnDefinition = "TEXT") private String targetValidationSummary;
-    @Column(columnDefinition = "TEXT") private String segmentSummary;
-    @Column(columnDefinition = "TEXT") private String improvementSummary;
-    @Column(columnDefinition = "TEXT") private String riskSummary;
-    @Column(columnDefinition = "TEXT") private String reportMarkdown;
 
-    public static FinalReport create(Long orderId, int responseCount, int purchase, int fit, int price,
-                                      int trust, int clarity, String verdict, String summary,
-                                      String purchaseSummary, String priceSummary, String trustSummary,
-                                      String targetSummary, String segmentSummary, String improvementSummary,
-                                      String riskSummary, String markdown) {
-        var r = new FinalReport();
-        r.reportOrderId = orderId; r.responseCount = responseCount;
-        r.overallPurchaseIntentScore = purchase; r.overallTargetFitScore = fit;
-        r.overallPriceAcceptanceScore = price; r.overallTrustScore = trust;
-        r.overallDetailPageClarityScore = clarity;
-        r.finalVerdict = verdict; r.executiveSummary = summary;
-        r.purchaseIntentSummary = purchaseSummary; r.priceSummary = priceSummary;
-        r.trustSummary = trustSummary; r.targetValidationSummary = targetSummary;
-        r.segmentSummary = segmentSummary; r.improvementSummary = improvementSummary;
-        r.riskSummary = riskSummary; r.reportMarkdown = markdown;
-        r.reportVersion = "detail_page_report_v1"; r.responseVersion = "detail_page_reaction_v1";
-        r.modelName = "deepseek-v4-flash"; r.modelVersion = "v1";
-        return r;
-    }
+    @Column(name = "product_target_profile_id")
+    private Long productTargetProfileId;
+
+    @Column(name = "page_snapshot_id")
+    private Long pageSnapshotId;
+
+    @Column(name = "report_version", length = 100)
+    private String reportVersion;
+
+    @Column(name = "response_version", length = 100)
+    private String responseVersion;
+
+    @Column(name = "model_name", length = 100)
+    private String modelName;
+
+    @Column(name = "model_version", length = 100)
+    private String modelVersion;
+
+    @Column(name = "response_count", nullable = false)
+    private int responseCount;
+
+    @Column(name = "overall_purchase_intent_score")
+    private Integer overallPurchaseIntentScore;
+
+    @Column(name = "overall_target_fit_score")
+    private Integer overallTargetFitScore;
+
+    @Column(name = "overall_price_acceptance_score")
+    private Integer overallPriceAcceptanceScore;
+
+    @Column(name = "overall_trust_score")
+    private Integer overallTrustScore;
+
+    @Column(name = "overall_detail_page_clarity_score")
+    private Integer overallDetailPageClarityScore;
+
+    @Column(name = "final_verdict", length = 50)
+    private String finalVerdict;
+
+    @Column(name = "executive_summary", columnDefinition = "TEXT")
+    private String executiveSummary;
+
+    @Column(name = "target_validation_summary", columnDefinition = "TEXT")
+    private String targetValidationSummary;
+
+    @Column(name = "purchase_intent_summary", columnDefinition = "TEXT")
+    private String purchaseIntentSummary;
+
+    @Column(name = "price_summary", columnDefinition = "TEXT")
+    private String priceSummary;
+
+    @Column(name = "trust_summary", columnDefinition = "TEXT")
+    private String trustSummary;
+
+    @Column(name = "detail_page_summary", columnDefinition = "TEXT")
+    private String detailPageSummary;
+
+    @Column(name = "segment_summary", columnDefinition = "TEXT")
+    private String segmentSummary;
+
+    @Column(name = "improvement_summary", columnDefinition = "TEXT")
+    private String improvementSummary;
+
+    @Column(name = "risk_summary", columnDefinition = "TEXT")
+    private String riskSummary;
+
+    @Column(name = "report_markdown", columnDefinition = "TEXT")
+    private String reportMarkdown;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "report_json", columnDefinition = "jsonb")
+    private String reportJson;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "aggregate_json", columnDefinition = "jsonb")
+    private String aggregateJson;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "raw_response", columnDefinition = "jsonb")
+    private String rawResponse;
 }

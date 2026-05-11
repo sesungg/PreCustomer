@@ -14,6 +14,7 @@
         .progress-bar-fill { height: 100%; background: #2563eb; transition: width 0.5s ease; border-radius: 4px; }
         .progress-bar-fill.complete { background: #047857; }
         .progress-bar-fill.failed { background: #b91c1c; }
+        .progress-bar-fill.stopped { background: #6b7280; }
         .progress-step-name { margin-top: 8px; color: #6b7280; font-size: 0.875rem; }
         .progress-error { color: #b91c1c; margin-top: 8px; font-size: 0.875rem; }
         .pipeline-output { max-width: 100%; overflow-x: auto; }
@@ -47,9 +48,19 @@
                 <button class="button secondary" type="submit">입금 확인 처리</button>
             </form>
             <button class="button primary" id="generate-btn" th:attr="data-order-id=${order.id}"
-                    th:if="${(progress == null || progress.status != 'COMPLETED') && !reportExists}"
-                    th:disabled="${progress != null && progress.status == 'IN_PROGRESS'}">
+                    th:if="${(progress == null || progress.status == 'FAILED' || progress.status == 'STOPPED') && !reportExists}"
+                    th:text="${progress != null && (progress.status == 'FAILED' || progress.status == 'STOPPED')} ? '리포트 재개' : '리포트 생성'">
                 리포트 생성
+            </button>
+            <button class="button secondary" id="stop-btn" th:attr="data-order-id=${order.id}"
+                    th:if="${progress != null && (progress.status == 'IN_PROGRESS' || progress.status == 'STOP_REQUESTED')}"
+                    th:disabled="${progress.status == 'STOP_REQUESTED'}"
+                    th:text="${progress.status == 'STOP_REQUESTED'} ? '중지 요청됨' : '생성 중지'">
+                생성 중지
+            </button>
+            <button class="button danger" id="regenerate-btn" th:attr="data-order-id=${order.id}"
+                    th:if="${(progress == null || (progress.status != 'IN_PROGRESS' && progress.status != 'STOP_REQUESTED')) && (reportExists || progress != null)}">
+                처음부터 다시 생성
             </button>
             <a class="button primary" th:if="${reportExists || (progress != null && progress.status == 'COMPLETED')}"
                th:href="@{/admin/reports/{id}(id=${order.id})}">리포트 보기</a>
@@ -64,12 +75,12 @@
          th:if="${progress != null}"
          th:style="${progress.status == 'COMPLETED' || progress.status == 'FAILED'} ? '' : 'display:block'">
         <div class="progress-header">
-            <h2 th:text="${progress.status == 'IN_PROGRESS'} ? '리포트 생성 중' : (${progress.status == 'COMPLETED'} ? '리포트 생성 완료' : (${progress.status == 'FAILED'} ? '리포트 생성 실패' : '대기 중'))"></h2>
+            <h2 th:text="${progress.status == 'IN_PROGRESS'} ? '리포트 생성 중' : (${progress.status == 'STOP_REQUESTED'} ? '중지 요청 중' : (${progress.status == 'STOPPED'} ? '리포트 생성 중지' : (${progress.status == 'COMPLETED'} ? '리포트 생성 완료' : (${progress.status == 'FAILED'} ? '리포트 생성 실패' : '대기 중'))))"></h2>
             <span class="progress-percent" th:text="${progress.currentStep} + '/' + ${progress.totalSteps}"></span>
         </div>
         <div class="progress-bar-track">
             <div class="progress-bar-fill"
-                 th:classappend="${progress.status == 'COMPLETED'} ? 'complete' : (${progress.status == 'FAILED'} ? 'failed' : '')"
+                 th:classappend="${progress.status == 'COMPLETED'} ? 'complete' : (${progress.status == 'FAILED'} ? 'failed' : (${progress.status == 'STOPPED'} ? 'stopped' : ''))"
                  th:style="'width: ' + (${progress.totalSteps > 0 ? progress.currentStep * 100 / progress.totalSteps : 0}) + '%'"></div>
         </div>
         <p class="progress-step-name" th:text="${progress.currentStepName}"></p>
@@ -135,39 +146,82 @@
     </section>
 </main>
 
-<script>
+<script th:inline="javascript">
     (function() {
-        var orderId = document.getElementById('generate-btn')?.getAttribute('data-order-id');
-        if (!orderId) return;
-
+        var orderId = /*[[${order.id}]]*/ null;
         var generateBtn = document.getElementById('generate-btn');
+        var stopBtn = document.getElementById('stop-btn');
+        var regenerateBtn = document.getElementById('regenerate-btn');
+        var defaultButtonText = generateBtn ? generateBtn.textContent : '리포트 생성';
         var progressPanel = document.getElementById('progress-panel');
         var pendingPanel = document.getElementById('progress-panel-pending');
-        var reportLink = document.querySelector('a[href*="/admin/reports/"]');
 
-        generateBtn.addEventListener('click', function() {
-            generateBtn.disabled = true;
-            generateBtn.textContent = '생성 중...';
+        if (!orderId) return;
 
-            fetch('/admin/orders/' + orderId + '/generate', { method: 'POST' })
+        if (generateBtn) {
+            generateBtn.addEventListener('click', function() {
+                startPipeline('/admin/orders/' + orderId + '/generate',
+                    defaultButtonText.indexOf('재개') >= 0 ? '재개 중...' : '생성 중...', generateBtn);
+            });
+        }
+
+        if (regenerateBtn) {
+            regenerateBtn.addEventListener('click', function() {
+                if (!confirm('기존 리포트 산출물을 삭제하고 처음부터 다시 생성할까요?')) return;
+                startPipeline('/admin/orders/' + orderId + '/regenerate', '재생성 중...', regenerateBtn);
+            });
+        }
+
+        if (stopBtn) {
+            stopBtn.addEventListener('click', function() {
+                stopBtn.disabled = true;
+                stopBtn.textContent = '중지 요청됨';
+                fetch('/admin/orders/' + orderId + '/stop', { method: 'POST' })
+                    .then(function(r) { return r.json(); })
+                    .then(function() { startPolling(); })
+                    .catch(function() {
+                        stopBtn.disabled = false;
+                        stopBtn.textContent = '생성 중지';
+                    });
+            });
+        }
+
+        function startPipeline(url, buttonText, trigger) {
+            if (stopBtn) stopBtn.style.display = 'inline-block';
+            if (regenerateBtn) regenerateBtn.disabled = true;
+            if (!trigger) return;
+            var originalText = trigger.textContent;
+            trigger.disabled = true;
+            trigger.textContent = buttonText;
+            fetch(url, { method: 'POST' })
                 .then(function(r) { return r.json(); })
-                .then(function() {
-                    // Show pending panel
+                .then(function(data) {
+                    if (data.status === 'already_running') {
+                        startPolling();
+                        return;
+                    }
                     if (pendingPanel) pendingPanel.style.display = 'block';
+                    if (progressPanel) progressPanel.style.display = 'none';
                     startPolling();
                 })
                 .catch(function() {
-                    generateBtn.disabled = false;
-                    generateBtn.textContent = '리포트 생성';
+                    trigger.disabled = false;
+                    trigger.textContent = originalText;
+                    if (regenerateBtn) regenerateBtn.disabled = false;
                 });
-        });
+        }
+
+        function disableStartButtons() {
+            if (generateBtn) generateBtn.disabled = true;
+            if (regenerateBtn) regenerateBtn.disabled = true;
+        }
 
         function startPolling() {
             var poll = setInterval(function() {
                 fetch('/admin/orders/' + orderId + '/progress')
                     .then(function(r) { return r.json(); })
                     .then(function(data) {
-                        var panel = progressPanel || pendingPanel;
+                        var panel = pendingPanel || progressPanel;
                         var title = document.getElementById('progress-title');
                         var stepText = document.getElementById('progress-step-text');
                         var bar = document.getElementById('progress-bar-fill');
@@ -195,6 +249,8 @@
                         if (title) {
                             if (data.status === 'COMPLETED') title.textContent = '리포트 생성 완료';
                             else if (data.status === 'FAILED') title.textContent = '리포트 생성 실패';
+                            else if (data.status === 'STOP_REQUESTED') title.textContent = '중지 요청 중';
+                            else if (data.status === 'STOPPED') title.textContent = '리포트 생성 중지';
                             else title.textContent = '리포트 생성 중';
                         }
                         if (err) {
@@ -204,9 +260,16 @@
 
                         if (data.completed) {
                             clearInterval(poll);
-                            generateBtn.style.display = 'none';
-                            // Reload to show report link
+                            if (generateBtn) generateBtn.style.display = 'none';
+                            if (stopBtn) stopBtn.style.display = 'none';
                             setTimeout(function() { location.reload(); }, 1500);
+                        } else {
+                            disableStartButtons();
+                            if (stopBtn) {
+                                stopBtn.style.display = 'inline-block';
+                                stopBtn.disabled = data.status === 'STOP_REQUESTED';
+                                stopBtn.textContent = data.status === 'STOP_REQUESTED' ? '중지 요청됨' : '생성 중지';
+                            }
                         }
                     });
             }, 2000);
@@ -214,10 +277,13 @@
 
         // If already in progress on page load, start polling
         var existingProgress = document.querySelector('#progress-panel') !== null;
-        var existingStatus = '{{progress != null ? progress.status : ""}}';
-        if (existingProgress && existingStatus === 'IN_PROGRESS') {
-            generateBtn.disabled = true;
-            generateBtn.textContent = '생성 중...';
+        var existingStatus = /*[[${progress != null ? progress.status : ''}]]*/ '';
+        if (existingProgress && (existingStatus === 'IN_PROGRESS' || existingStatus === 'STOP_REQUESTED')) {
+            if (generateBtn) {
+                generateBtn.disabled = true;
+                generateBtn.textContent = existingStatus === 'STOP_REQUESTED' ? '중지 요청됨' : '생성 중...';
+            }
+            if (regenerateBtn) regenerateBtn.disabled = true;
             startPolling();
         }
     })();

@@ -1,0 +1,105 @@
+{
+  "row_count": 408,
+  "scores": {
+    "digital_affinity_score": {
+      "status_counts": {
+        "WEAK": 194,
+        "STRONG": 172,
+        "UNKNOWN": 42
+      },
+      "mean_confidence": 0.6388480392156862,
+      "mean_train_weight": 0.5642156862745097,
+      "trainable_count": 366
+    },
+    "price_sensitivity_score": {
+      "status_counts": {
+        "UNKNOWN": 193,
+        "WEAK": 139,
+        "STRONG": 76
+      },
+      "mean_confidence": 0.5050245098039216,
+      "mean_train_weight": 0.2884803921568627,
+      "trainable_count": 215
+    },
+    "trust_sensitivity_score": {
+      "status_counts": {
+        "UNKNOWN": 192,
+        "WEAK": 169,
+        "STRONG": 47
+      },
+      "mean_confidence": 0.486764705882353,
+      "mean_train_weight": 0.2394607843137255,
+      "trainable_count": 216
+    },
+    "convenience_need_score": {
+      "status_counts": {
+        "WEAK": 199,
+        "UNKNOWN": 111,
+        "STRONG": 98
+      },
+      "mean_confidence": 0.5444852941176471,
+      "mean_train_weight": 0.3865196078431372,
+      "trainable_count": 297
+    },
+    "quality_sensitivity_score": {
+      "status_counts": {
+        "WEAK": 194,
+        "STRONG": 152,
+        "UNKNOWN": 62
+      },
+      "mean_confidence": 0.6128676470588235,
+      "mean_train_weight": 0.5151960784313725,
+      "trainable_count": 346
+    },
+    "novelty_acceptance_score": {
+      "status_counts": {
+        "STRONG": 192,
+        "WEAK": 183,
+        "UNKNOWN": 33
+      },
+      "mean_confidence": 0.6421568627450981,
+      "mean_train_weight": 0.6051470588235294,
+      "trainable_count": 375
+    },
+    "local_affinity_score": {
+      "status_counts": {
+        "STRONG": 334,
+        "WEAK": 54,
+        "UNKNOWN": 20
+      },
+      "mean_confidence": 0.7676470588235296,
+      "mean_train_weight": 0.8583333333333333,
+      "trainable_count": 388
+    },
+    "family_decision_score": {
+      "status_counts": {
+        "STRONG": 282,
+        "WEAK": 82,
+        "UNKNOWN": 44
+      },
+      "mean_confidence": 0.7264705882352941,
+      "mean_train_weight": 0.7514705882352942,
+      "trainable_count": 364
+    },
+    "health_safety_sensitivity_score": {
+      "status_counts": {
+        "UNKNOWN": 181,
+        "WEAK": 121,
+        "STRONG": 106
+      },
+      "mean_confidence": 0.5253676470588236,
+      "mean_train_weight": 0.3487745098039216,
+      "trainable_count": 227
+    },
+    "review_dependency_score": {
+      "status_counts": {
+        "UNKNOWN": 307,
+        "WEAK": 70,
+        "STRONG": 31
+      },
+      "mean_confidence": 0.4161764705882353,
+      "mean_train_weight": 0.12745098039215685,
+      "trainable_count": 101
+    }
+  }
+}

@@ -62,15 +62,59 @@ public class AdminOrderController {
         return "redirect:/admin/orders/" + id;
     }
 
-    /** 비동기 리포트 생성 시작. 즉시 응답 후 백그라운드 실행. */
+    /** 비동기 리포트 생성 시작. 즉시 응답 후 백그라운드 실행.
+     * FAILED/STOPPED 상태는 재개(resume), 그 외는 신규 시작으로 응답 메시지를 구분한다.
+     * markPaid는 REQUESTED 상태일 때만 호출하여 이미 PAID 이상인 주문의 상태를 되돌리지 않는다.
+     */
     @PostMapping("/{id}/generate")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> generate(@PathVariable Long id) {
-        orderService.markPaid(id);
+        if (progressService.findById(id).filter(PipelineProgress::isActive).isPresent()) {
+            return ResponseEntity.ok(Map.of("status", "already_running", "orderId", id));
+        }
+        // FAILED/STOPPED 이력이 있으면 재개, 없으면 신규 시작
+        boolean resume = progressService.findById(id)
+                .map(p -> PipelineProgress.STATUS_FAILED.equals(p.getStatus())
+                        || PipelineProgress.STATUS_STOPPED.equals(p.getStatus()))
+                .orElse(false);
+        // REQUESTED 상태인 경우에만 PAID로 전이 (이미 PAID 이상이면 상태 유지)
         var order = orderService.getOrder(id);
+        if (OrderStatus.REQUESTED.equals(order.getStatus())) {
+            orderService.markPaid(id);
+        }
         List<Path> imagePaths = imageStorageService.resolvePaths(order.getImagePaths());
         reportPipelineService.runDetailPagePipeline(id, imagePaths);
-        return ResponseEntity.ok(Map.of("status", "started", "orderId", id));
+        return ResponseEntity.ok(Map.of("status", resume ? "resumed" : "started", "orderId", id));
+    }
+
+    /** 실행 중인 리포트 생성을 graceful stop으로 요청한다. */
+    @PostMapping("/{id}/stop")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> stop(@PathVariable Long id) {
+        boolean accepted = reportPipelineService.requestStop(id);
+        return ResponseEntity.ok(Map.of(
+                "status", accepted ? "stop_requested" : "not_running",
+                "orderId", id
+        ));
+    }
+
+    /** 기존 리포트 산출물을 삭제하고 처음부터 다시 생성한다.
+     * markPaid는 REQUESTED 상태일 때만 호출하여 이미 PAID 이상인 주문의 상태를 되돌리지 않는다.
+     */
+    @PostMapping("/{id}/regenerate")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> regenerate(@PathVariable Long id) {
+        if (progressService.findById(id).filter(PipelineProgress::isActive).isPresent()) {
+            return ResponseEntity.ok(Map.of("status", "already_running", "orderId", id));
+        }
+        // REQUESTED 상태인 경우에만 PAID로 전이 (이미 PAID 이상이면 상태 유지)
+        var order = orderService.getOrder(id);
+        if (OrderStatus.REQUESTED.equals(order.getStatus())) {
+            orderService.markPaid(id);
+        }
+        List<Path> imagePaths = imageStorageService.resolvePaths(order.getImagePaths());
+        reportPipelineService.regenerateDetailPagePipeline(id, imagePaths);
+        return ResponseEntity.ok(Map.of("status", "regenerating", "orderId", id));
     }
 
     /** 리포트 생성 진행상황 폴링 API. JS에서 2초 간격으로 호출. */
@@ -90,11 +134,14 @@ public class AdminOrderController {
         if (p.getStepStartedAt() != null) {
             elapsedSec = java.time.Duration.between(p.getStepStartedAt(), java.time.LocalDateTime.now()).getSeconds();
         }
+        boolean completed = PipelineProgress.STATUS_COMPLETED.equals(p.getStatus())
+                || PipelineProgress.STATUS_FAILED.equals(p.getStatus())
+                || PipelineProgress.STATUS_STOPPED.equals(p.getStatus());
         return ResponseEntity.ok(Map.of(
                 "status", p.getStatus(), "currentStep", p.getCurrentStep(),
                 "totalSteps", p.getTotalSteps(), "currentStepName", p.getCurrentStepName(),
                 "errorMessage", p.getErrorMessage() != null ? p.getErrorMessage() : "",
-                "completed", "COMPLETED".equals(p.getStatus()) || "FAILED".equals(p.getStatus()),
+                "completed", completed,
                 "elapsedSeconds", elapsedSec
         ));
     }

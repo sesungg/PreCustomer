@@ -7,7 +7,10 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
 public interface SelectedPersonaRepository extends JpaRepository<SelectedPersona, Long> {
+
     List<SelectedPersona> findByReportOrderId(Long orderId);
-    @Modifying @Query("DELETE FROM SelectedPersona WHERE reportOrderId = ?1")
+
+    @Modifying
+    @Query("DELETE FROM SelectedPersona WHERE reportOrderId = ?1")
     void deleteByReportOrderId(Long orderId);
 }

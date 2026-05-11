@@ -31,10 +31,21 @@ public class ShoppingSearchService {
     @Transactional
     public Map<String, Object> executeSearch(String query, String baseProductName, Integer basePrice,
                                               String cat1, String cat2, String cat3, String cat4, boolean useVariants) {
+        return executeSearch(null, query, baseProductName, basePrice, cat1, cat2, cat3, cat4, useVariants);
+    }
+
+    @Transactional
+    public Map<String, Object> executeReportSearch(Long reportId, String query, String baseProductName, Integer basePrice,
+                                                   String cat1, String cat2, String cat3, String cat4, boolean useVariants) {
+        return executeSearch(reportId, query, baseProductName, basePrice, cat1, cat2, cat3, cat4, useVariants);
+    }
+
+    private Map<String, Object> executeSearch(Long reportId, String query, String baseProductName, Integer basePrice,
+                                              String cat1, String cat2, String cat3, String cat4, boolean useVariants) {
         // 1. searchGroup 생성
         Long groupId = jdbc.queryForObject(
-                "INSERT INTO shopping_search_group (search_purpose, original_query, base_product_name, base_price, base_category1, base_category2, base_category3, base_category4, collected_at) VALUES ('REPORT_PREPARE',?,?,?,?,?,?,?,NOW()) RETURNING id",
-                Long.class, query, baseProductName, basePrice, cat1, cat2, cat3, cat4);
+                "INSERT INTO shopping_search_group (report_id, search_purpose, original_query, base_product_name, base_price, base_category1, base_category2, base_category3, base_category4, collected_at) VALUES (?,'REPORT_PREPARE',?,?,?,?,?,?,?,NOW()) RETURNING id",
+                Long.class, reportId, query, baseProductName, basePrice, cat1, cat2, cat3, cat4);
 
         // 2. query variants 생성
         List<String> queries = useVariants ? generateQueryVariants(query, cat1, cat2, cat3) : List.of(query);

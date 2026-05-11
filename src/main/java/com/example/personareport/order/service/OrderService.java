@@ -83,11 +83,27 @@ public class OrderService {
         return order;
     }
 
+    /** 주문 상태를 GENERATING으로 변경한다. */
+    @Transactional
+    public ReactionReportOrder markGenerating(Long id) {
+        ReactionReportOrder order = getOrder(id);
+        order.markGenerating();
+        return order;
+    }
+
     /** 주문 상태를 FAILED로 변경한다. */
     @Transactional
     public ReactionReportOrder markFailed(Long id) {
         ReactionReportOrder order = getOrder(id);
         order.markFailed();
+        return order;
+    }
+
+    /** 주문 상태를 STOPPED로 변경한다. */
+    @Transactional
+    public ReactionReportOrder markStopped(Long id) {
+        ReactionReportOrder order = getOrder(id);
+        order.markStopped();
         return order;
     }
 

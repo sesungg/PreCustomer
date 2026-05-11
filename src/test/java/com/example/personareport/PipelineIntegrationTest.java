@@ -83,6 +83,10 @@ class PipelineIntegrationTest {
         // FAILED → COMPLETED (재생성 성공 시)
         orderService.markCompleted(id);
         assertThat(orderService.getOrder(id).getStatus()).isEqualTo(OrderStatus.COMPLETED);
+
+        // COMPLETED → STOPPED (운영자가 중지 처리할 수 있음)
+        orderService.markStopped(id);
+        assertThat(orderService.getOrder(id).getStatus()).isEqualTo(OrderStatus.STOPPED);
     }
 
     @Test
@@ -126,6 +130,27 @@ class PipelineIntegrationTest {
         var completed = progressService.findById(999L);
         assertThat(completed).isPresent();
         assertThat(completed.get().getStatus()).isEqualTo("COMPLETED");
+    }
+
+    @Test
+    void pipelineProgress_stopRequestAndStoppedState() {
+        var progress = PipelineProgress.start(996L, 5);
+        progressService.save(progress);
+
+        boolean accepted = progressService.requestStop(996L);
+        var stopRequested = progressService.findById(996L);
+
+        assertThat(accepted).isTrue();
+        assertThat(stopRequested).isPresent();
+        assertThat(stopRequested.get().getStatus()).isEqualTo(PipelineProgress.STATUS_STOP_REQUESTED);
+
+        stopRequested.get().stop("사용자 요청으로 중지");
+        progressService.save(stopRequested.get());
+
+        var stopped = progressService.findById(996L);
+        assertThat(stopped).isPresent();
+        assertThat(stopped.get().getStatus()).isEqualTo(PipelineProgress.STATUS_STOPPED);
+        assertThat(stopped.get().getErrorMessage()).contains("사용자 요청");
     }
 
     @Test

@@ -1,0 +1,241 @@
+{
+  "created_at": "2026-04-30T23:17:50.256804",
+  "train_rows": 2400,
+  "valid_rows": 600,
+  "score_columns": [
+    "digital_affinity_score",
+    "price_sensitivity_score",
+    "trust_sensitivity_score",
+    "convenience_need_score",
+    "quality_sensitivity_score",
+    "novelty_acceptance_score",
+    "local_affinity_score",
+    "family_decision_score",
+    "health_safety_sensitivity_score",
+    "review_dependency_score"
+  ],
+  "model": {
+    "type": "tfidf_ridge",
+    "max_features": 60000,
+    "min_df": 2,
+    "max_df": 0.95,
+    "ngram_range": [
+      1,
+      2
+    ],
+    "alpha": 2.0,
+    "solver": "lsqr"
+  },
+  "train_metrics": {
+    "digital_affinity_score": {
+      "mae": 5.4327,
+      "rmse": 6.7864,
+      "true_avg": 47.6958,
+      "pred_avg": 47.6958,
+      "true_min": 10.0,
+      "true_max": 90.0,
+      "pred_min": 14.665,
+      "pred_max": 79.7544
+    },
+    "price_sensitivity_score": {
+      "mae": 3.3245,
+      "rmse": 4.3406,
+      "true_avg": 60.5479,
+      "pred_avg": 60.5479,
+      "true_min": 30.0,
+      "true_max": 85.0,
+      "pred_min": 42.4883,
+      "pred_max": 77.5486
+    },
+    "trust_sensitivity_score": {
+      "mae": 2.841,
+      "rmse": 3.4757,
+      "true_avg": 65.0563,
+      "pred_avg": 65.0563,
+      "true_min": 40.0,
+      "true_max": 80.0,
+      "pred_min": 53.0908,
+      "pred_max": 74.7314
+    },
+    "convenience_need_score": {
+      "mae": 4.1429,
+      "rmse": 5.346,
+      "true_avg": 49.5562,
+      "pred_avg": 49.5563,
+      "true_min": 25.0,
+      "true_max": 85.0,
+      "pred_min": 33.6288,
+      "pred_max": 68.4782
+    },
+    "quality_sensitivity_score": {
+      "mae": 3.5718,
+      "rmse": 4.4793,
+      "true_avg": 70.7729,
+      "pred_avg": 70.7729,
+      "true_min": 35.0,
+      "true_max": 90.0,
+      "pred_min": 54.8784,
+      "pred_max": 82.8907
+    },
+    "novelty_acceptance_score": {
+      "mae": 4.8557,
+      "rmse": 5.9921,
+      "true_avg": 44.9104,
+      "pred_avg": 44.9104,
+      "true_min": 15.0,
+      "true_max": 90.0,
+      "pred_min": 21.3347,
+      "pred_max": 73.6741
+    },
+    "local_affinity_score": {
+      "mae": 3.9684,
+      "rmse": 4.7208,
+      "true_avg": 61.8771,
+      "pred_avg": 61.8771,
+      "true_min": 40.0,
+      "true_max": 85.0,
+      "pred_min": 46.9533,
+      "pred_max": 79.175
+    },
+    "family_decision_score": {
+      "mae": 5.269,
+      "rmse": 7.4358,
+      "true_avg": 68.7875,
+      "pred_avg": 68.7875,
+      "true_min": 10.0,
+      "true_max": 90.0,
+      "pred_min": 35.2091,
+      "pred_max": 87.9015
+    },
+    "health_safety_sensitivity_score": {
+      "mae": 4.557,
+      "rmse": 5.7496,
+      "true_avg": 60.0896,
+      "pred_avg": 60.0896,
+      "true_min": 20.0,
+      "true_max": 90.0,
+      "pred_min": 39.4708,
+      "pred_max": 80.3384
+    },
+    "review_dependency_score": {
+      "mae": 2.9872,
+      "rmse": 3.7825,
+      "true_avg": 59.6229,
+      "pred_avg": 59.6229,
+      "true_min": 30.0,
+      "true_max": 85.0,
+      "pred_min": 49.5173,
+      "pred_max": 73.5373
+    },
+    "overall": {
+      "mae": 4.095,
+      "rmse": 5.3523
+    }
+  },
+  "valid_metrics": {
+    "digital_affinity_score": {
+      "mae": 7.2572,
+      "rmse": 9.2007,
+      "true_avg": 48.1667,
+      "pred_avg": 48.239,
+      "true_min": 10.0,
+      "true_max": 90.0,
+      "pred_min": 19.0731,
+      "pred_max": 78.4884
+    },
+    "price_sensitivity_score": {
+      "mae": 4.6853,
+      "rmse": 6.0715,
+      "true_avg": 59.925,
+      "pred_avg": 60.2944,
+      "true_min": 40.0,
+      "true_max": 85.0,
+      "pred_min": 48.0467,
+      "pred_max": 73.8709
+    },
+    "trust_sensitivity_score": {
+      "mae": 3.8777,
+      "rmse": 4.7562,
+      "true_avg": 64.725,
+      "pred_avg": 64.7949,
+      "true_min": 50.0,
+      "true_max": 80.0,
+      "pred_min": 55.5061,
+      "pred_max": 72.7671
+    },
+    "convenience_need_score": {
+      "mae": 6.1,
+      "rmse": 7.8383,
+      "true_avg": 49.9,
+      "pred_avg": 49.7711,
+      "true_min": 30.0,
+      "true_max": 85.0,
+      "pred_min": 34.6318,
+      "pred_max": 63.7729
+    },
+    "quality_sensitivity_score": {
+      "mae": 5.2952,
+      "rmse": 6.7196,
+      "true_avg": 70.7333,
+      "pred_avg": 70.6947,
+      "true_min": 40.0,
+      "true_max": 90.0,
+      "pred_min": 56.9897,
+      "pred_max": 81.1588
+    },
+    "novelty_acceptance_score": {
+      "mae": 6.4846,
+      "rmse": 8.0791,
+      "true_avg": 45.45,
+      "pred_avg": 45.2035,
+      "true_min": 15.0,
+      "true_max": 85.0,
+      "pred_min": 23.4734,
+      "pred_max": 66.2314
+    },
+    "local_affinity_score": {
+      "mae": 5.8392,
+      "rmse": 7.0125,
+      "true_avg": 61.2833,
+      "pred_avg": 61.5447,
+      "true_min": 45.0,
+      "true_max": 85.0,
+      "pred_min": 46.4476,
+      "pred_max": 76.8269
+    },
+    "family_decision_score": {
+      "mae": 7.5553,
+      "rmse": 10.8395,
+      "true_avg": 68.7833,
+      "pred_avg": 69.0038,
+      "true_min": 10.0,
+      "true_max": 90.0,
+      "pred_min": 43.5995,
+      "pred_max": 87.9688
+    },
+    "health_safety_sensitivity_score": {
+      "mae": 6.6511,
+      "rmse": 8.3803,
+      "true_avg": 59.7833,
+      "pred_avg": 59.8508,
+      "true_min": 30.0,
+      "true_max": 90.0,
+      "pred_min": 44.3421,
+      "pred_max": 78.1168
+    },
+    "review_dependency_score": {
+      "mae": 4.5417,
+      "rmse": 5.7375,
+      "true_avg": 59.6583,
+      "pred_avg": 59.3305,
+      "true_min": 50.0,
+      "true_max": 85.0,
+      "pred_min": 52.3659,
+      "pred_max": 69.0564
+    },
+    "overall": {
+      "mae": 5.8287,
+      "rmse": 7.6539
+    }
+  }
+}

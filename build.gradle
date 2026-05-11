@@ -37,6 +37,14 @@ dependencies {
     runtimeOnly 'com.h2database:h2'
     runtimeOnly 'org.postgresql:postgresql'
 
+    // Markdown → HTML 변환 (CommonMark)
+    implementation 'org.commonmark:commonmark:0.22.0'
+    // HTML → PDF 변환 (OpenPDF + Flying Saucer) - Java 17 호환 버전
+    implementation('com.github.librepdf:openpdf:1.4.2')
+    implementation('org.xhtmlrenderer:flying-saucer-pdf-openpdf:9.4.0') {
+        exclude group: 'com.github.librepdf', module: 'openpdf'
+    }
+
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }

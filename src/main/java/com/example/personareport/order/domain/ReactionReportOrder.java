@@ -134,6 +134,10 @@ public class ReactionReportOrder extends BaseTimeEntity {
         this.status = OrderStatus.COMPLETED;
     }
 
+    public void markStopped() {
+        this.status = OrderStatus.STOPPED;
+    }
+
     public void markFailed() {
         this.status = OrderStatus.FAILED;
     }

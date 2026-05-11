@@ -1,6 +1,13 @@
 spring:
   application:
     name: precustomer
+  cloud:
+    openfeign:
+      client:
+        config:
+          deepseek:
+            connectTimeout: 10000
+            readTimeout: 180000
   profiles:
     default: local
   servlet:
@@ -8,11 +15,6 @@ spring:
       enabled: true
       max-file-size: 10MB
       max-request-size: 50MB
-
-#logging:
-#  level:
-#    org.thymeleaf: DEBUG
-#    org.springframework.web.servlet: DEBUG
 
 app:
   upload:
@@ -25,16 +27,24 @@ app:
     import-batch-size: 3000
     import-source: NEMOTRON
   pipeline:
-    scripts-dir: /Users/ssg/dev/datasets/scripts
+    scripts-dir: ${PIPELINE_SCRIPTS_DIR:./scripts/pipeline}
     python-bin: python3
     db-host: localhost
     db-port: 5432
     db-name: precustomer
     db-user: postgres
     db-password: postgres
+    persona-candidate-limit: ${REPORT_PERSONA_CANDIDATE_LIMIT:50000}
+    reaction-concurrency: ${REPORT_REACTION_CONCURRENCY:3}
+    stale-timeout-minutes: ${REPORT_PIPELINE_STALE_TIMEOUT_MINUTES:60}
+    selected-count: ${REPORT_SELECTED_COUNT:30}  # 운영 시 100으로 변경 (또는 환경변수로 주입)
+    gemini-api-key: ${GEMINI_API_KEY:}
   deepseek:
     base-url: https://api.deepseek.com
     model: deepseek-v4-flash
+    target-profile-model: ${DEEPSEEK_TARGET_PROFILE_MODEL:${app.deepseek.model}}
+    reaction-model: ${DEEPSEEK_REACTION_MODEL:${app.deepseek.model}}
+    final-report-model: ${DEEPSEEK_FINAL_REPORT_MODEL:${app.deepseek.model}}
     api-key: ${DEEPSEEK_API_KEY:}
     temperature: 0.4
     max-tokens: 6000

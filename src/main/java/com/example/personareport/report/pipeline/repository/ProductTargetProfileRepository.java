@@ -7,7 +7,13 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
 public interface ProductTargetProfileRepository extends JpaRepository<ProductTargetProfile, Long> {
+
     Optional<ProductTargetProfile> findFirstByReportOrderIdOrderByIdDesc(Long orderId);
-    @Modifying @Query("DELETE FROM ProductTargetProfile WHERE reportOrderId = ?1")
+
+    Optional<ProductTargetProfile> findFirstByReportOrderIdAndProfileVersionOrderByUpdatedAtDescIdDesc(
+            Long orderId, String profileVersion);
+
+    @Modifying
+    @Query("DELETE FROM ProductTargetProfile WHERE reportOrderId = ?1")
     void deleteByReportOrderId(Long orderId);
 }
