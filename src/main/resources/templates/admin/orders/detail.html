@@ -48,18 +48,18 @@
                 <button class="button secondary" type="submit">입금 확인 처리</button>
             </form>
             <button class="button primary" id="generate-btn" th:attr="data-order-id=${order.id}"
-                    th:if="${(progress == null || progress.status == 'FAILED' || progress.status == 'STOPPED') && !reportExists}"
+                    th:if="${(reportJob == null || (reportJob.status != 'PENDING' && reportJob.status != 'RUNNING' && reportJob.status != 'STOP_REQUESTED')) && (progress == null || progress.status == 'FAILED' || progress.status == 'STOPPED') && !reportExists}"
                     th:text="${progress != null && (progress.status == 'FAILED' || progress.status == 'STOPPED')} ? '리포트 재개' : '리포트 생성'">
                 리포트 생성
             </button>
             <button class="button secondary" id="stop-btn" th:attr="data-order-id=${order.id}"
-                    th:if="${progress != null && (progress.status == 'IN_PROGRESS' || progress.status == 'STOP_REQUESTED')}"
-                    th:disabled="${progress.status == 'STOP_REQUESTED'}"
-                    th:text="${progress.status == 'STOP_REQUESTED'} ? '중지 요청됨' : '생성 중지'">
+                    th:if="${(progress != null && (progress.status == 'IN_PROGRESS' || progress.status == 'STOP_REQUESTED')) || (reportJob != null && (reportJob.status == 'PENDING' || reportJob.status == 'RUNNING' || reportJob.status == 'STOP_REQUESTED'))}"
+                    th:disabled="${(progress != null && progress.status == 'STOP_REQUESTED') || (reportJob != null && reportJob.status == 'STOP_REQUESTED')}"
+                    th:text="${(progress != null && progress.status == 'STOP_REQUESTED') || (reportJob != null && reportJob.status == 'STOP_REQUESTED')} ? '중지 요청됨' : '생성 중지'">
                 생성 중지
             </button>
             <button class="button danger" id="regenerate-btn" th:attr="data-order-id=${order.id}"
-                    th:if="${(progress == null || (progress.status != 'IN_PROGRESS' && progress.status != 'STOP_REQUESTED')) && (reportExists || progress != null)}">
+                    th:if="${(reportJob == null || (reportJob.status != 'PENDING' && reportJob.status != 'RUNNING' && reportJob.status != 'STOP_REQUESTED')) && (progress == null || (progress.status != 'IN_PROGRESS' && progress.status != 'STOP_REQUESTED')) && (reportExists || progress != null)}">
                 처음부터 다시 생성
             </button>
             <a class="button primary" th:if="${reportExists || (progress != null && progress.status == 'COMPLETED')}"
@@ -249,6 +249,7 @@
                         if (title) {
                             if (data.status === 'COMPLETED') title.textContent = '리포트 생성 완료';
                             else if (data.status === 'FAILED') title.textContent = '리포트 생성 실패';
+                            else if (data.status === 'PENDING') title.textContent = '작업 대기 중';
                             else if (data.status === 'STOP_REQUESTED') title.textContent = '중지 요청 중';
                             else if (data.status === 'STOPPED') title.textContent = '리포트 생성 중지';
                             else title.textContent = '리포트 생성 중';

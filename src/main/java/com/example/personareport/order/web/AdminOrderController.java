@@ -3,6 +3,8 @@ package com.example.personareport.order.web;
 import com.example.personareport.order.domain.OrderStatus;
 import com.example.personareport.order.service.OrderService;
 import com.example.personareport.report.domain.PipelineProgress;
+import com.example.personareport.report.job.ReportJobService;
+import com.example.personareport.report.job.ReportJobStatus;
 import com.example.personareport.report.service.ImageStorageService;
 import com.example.personareport.report.service.PipelineProgressService;
 import com.example.personareport.report.service.ReportDataService;
@@ -32,6 +34,7 @@ public class AdminOrderController {
     private final ImageStorageService imageStorageService;
     private final ReportPipelineService reportPipelineService;
     private final PipelineProgressService progressService;
+    private final ReportJobService reportJobService;
     private final ReportDataService reportDataService;
 
     /** 주문 목록 페이지. status 파라미터로 필터링 가능. */
@@ -52,6 +55,7 @@ public class AdminOrderController {
         model.addAttribute("imageFilenames", imagePaths.stream()
                 .map(Path::getFileName).map(Path::toString).toList());
         progressService.findById(id).ifPresent(p -> model.addAttribute("progress", p));
+        reportJobService.findLatestForOrder(id).ifPresent(j -> model.addAttribute("reportJob", j));
         model.addAttribute("reportExists", reportDataService.countReportByOrderId(id) > 0);
         return "admin/orders/detail";
     }
@@ -69,7 +73,8 @@ public class AdminOrderController {
     @PostMapping("/{id}/generate")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> generate(@PathVariable Long id) {
-        if (progressService.findById(id).filter(PipelineProgress::isActive).isPresent()) {
+        if (progressService.findById(id).filter(PipelineProgress::isActive).isPresent()
+                || reportJobService.hasActiveJob(id)) {
             return ResponseEntity.ok(Map.of("status", "already_running", "orderId", id));
         }
         // FAILED/STOPPED 이력이 있으면 재개, 없으면 신규 시작
@@ -83,15 +88,20 @@ public class AdminOrderController {
             orderService.markPaid(id);
         }
         List<Path> imagePaths = imageStorageService.resolvePaths(order.getImagePaths());
-        reportPipelineService.runDetailPagePipeline(id, imagePaths);
-        return ResponseEntity.ok(Map.of("status", resume ? "resumed" : "started", "orderId", id));
+        var job = reportJobService.enqueueDetailPageReport(id, false, !imagePaths.isEmpty());
+        return ResponseEntity.ok(Map.of(
+                "status", resume ? "resume_queued" : "queued",
+                "orderId", id,
+                "jobId", job.getId()
+        ));
     }
 
     /** 실행 중인 리포트 생성을 graceful stop으로 요청한다. */
     @PostMapping("/{id}/stop")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> stop(@PathVariable Long id) {
-        boolean accepted = reportPipelineService.requestStop(id);
+        boolean accepted = reportJobService.requestCancelForOrder(id);
+        accepted = reportPipelineService.requestStop(id) || accepted;
         return ResponseEntity.ok(Map.of(
                 "status", accepted ? "stop_requested" : "not_running",
                 "orderId", id
@@ -104,7 +114,8 @@ public class AdminOrderController {
     @PostMapping("/{id}/regenerate")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> regenerate(@PathVariable Long id) {
-        if (progressService.findById(id).filter(PipelineProgress::isActive).isPresent()) {
+        if (progressService.findById(id).filter(PipelineProgress::isActive).isPresent()
+                || reportJobService.hasActiveJob(id)) {
             return ResponseEntity.ok(Map.of("status", "already_running", "orderId", id));
         }
         // REQUESTED 상태인 경우에만 PAID로 전이 (이미 PAID 이상이면 상태 유지)
@@ -113,8 +124,8 @@ public class AdminOrderController {
             orderService.markPaid(id);
         }
         List<Path> imagePaths = imageStorageService.resolvePaths(order.getImagePaths());
-        reportPipelineService.regenerateDetailPagePipeline(id, imagePaths);
-        return ResponseEntity.ok(Map.of("status", "regenerating", "orderId", id));
+        var job = reportJobService.enqueueDetailPageReport(id, true, !imagePaths.isEmpty());
+        return ResponseEntity.ok(Map.of("status", "regenerate_queued", "orderId", id, "jobId", job.getId()));
     }
 
     /** 리포트 생성 진행상황 폴링 API. JS에서 2초 간격으로 호출. */
@@ -122,6 +133,23 @@ public class AdminOrderController {
     @ResponseBody
     public ResponseEntity<Map<String, Object>> getProgress(@PathVariable Long id) {
         Optional<PipelineProgress> opt = progressService.findById(id);
+        var latestJob = reportJobService.findLatestForOrder(id);
+        if (latestJob.isPresent()
+                && ReportJobStatus.ACTIVE.contains(latestJob.get().getStatus())
+                && (opt.isEmpty() || opt.get().isTerminal())) {
+            var job = latestJob.get();
+            String currentStepName = job.getAttemptCount() > 0
+                    ? "재시도 대기 중"
+                    : "리포트 작업 대기 중";
+            return ResponseEntity.ok(Map.of(
+                    "status", job.getStatus(),
+                    "currentStep", opt.map(PipelineProgress::getCurrentStep).orElse(0),
+                    "totalSteps", opt.map(PipelineProgress::getTotalSteps).orElse(0),
+                    "currentStepName", currentStepName,
+                    "errorMessage", job.getErrorMessage() != null ? job.getErrorMessage() : "",
+                    "completed", false
+            ));
+        }
         if (opt.isEmpty()) {
             return ResponseEntity.ok(Map.of(
                     "status", "PENDING", "currentStep", 0, "totalSteps", 0,

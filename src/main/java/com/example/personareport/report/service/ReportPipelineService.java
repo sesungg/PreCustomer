@@ -3,6 +3,7 @@ package com.example.personareport.report.service;
 import com.example.personareport.modules.shopping.service.ShoppingSearchService;
 import com.example.personareport.order.service.OrderService;
 import com.example.personareport.report.domain.PipelineProgress;
+import com.example.personareport.report.job.ReportJobService;
 import com.example.personareport.report.pipeline.PipelineQueryService;
 import com.example.personareport.report.pipeline.PipelineJavaService;
 import com.example.personareport.report.pipeline.PipelineSaveService;
@@ -34,6 +35,7 @@ public class ReportPipelineService {
     private final PipelineJavaService pipelineJava;
     private final PipelineQueryService queryService;
     private final PipelineSaveService saveService;
+    private final ReportJobService jobService;
     private final OrderService orderService;
     private final ShoppingSearchService shoppingService;
 
@@ -69,13 +71,19 @@ public class ReportPipelineService {
     /** 비동기로 전체 파이프라인 실행. DB 산출물 기준으로 완료된 단계는 건너뛰고 누락된 단계만 재개한다. */
     @Async
     public void runDetailPagePipeline(Long orderId, List<Path> imagePaths) {
-        runPipeline(orderId, imagePaths, false);
+        runPipeline(orderId, imagePaths, false, null, Duration.ofMinutes(staleTimeoutMinutes));
     }
 
     /** 비동기로 주문 단위 리포트 산출물을 삭제한 뒤 처음부터 재생성한다. */
     @Async
     public void regenerateDetailPagePipeline(Long orderId, List<Path> imagePaths) {
-        runPipeline(orderId, imagePaths, true);
+        runPipeline(orderId, imagePaths, true, null, Duration.ofMinutes(staleTimeoutMinutes));
+    }
+
+    /** report_job 워커가 호출하는 동기 실행 진입점. */
+    public String executeDetailPagePipeline(Long orderId, List<Path> imagePaths, boolean regenerateFromScratch,
+                                            Long reportJobId, Duration jobLeaseDuration) {
+        return runPipeline(orderId, imagePaths, regenerateFromScratch, reportJobId, jobLeaseDuration);
     }
 
     /** 실행 중인 파이프라인에 graceful stop을 요청한다. */
@@ -94,7 +102,8 @@ public class ReportPipelineService {
         return progressService.requestStop(orderId);
     }
 
-    private void runPipeline(Long orderId, List<Path> imagePaths, boolean regenerateFromScratch) {
+    private String runPipeline(Long orderId, List<Path> imagePaths, boolean regenerateFromScratch,
+                               Long reportJobId, Duration jobLeaseDuration) {
         boolean hasImages = imagePaths != null && !imagePaths.isEmpty();
         int totalSteps = TOTAL_STEPS_BASE + (hasImages ? 2 : 0);
 
@@ -104,7 +113,7 @@ public class ReportPipelineService {
             if (!activeProgress.isStale(Duration.ofMinutes(staleTimeoutMinutes))) {
                 log.info("이미 실행 중인 파이프라인이 있어 새 실행을 건너뜁니다. orderId={}, status={}",
                         orderId, activeProgress.getStatus());
-                return;
+                return activeProgress.getStatus();
             }
             activeProgress.fail("오래 응답하지 않는 기존 실행을 실패 처리하고 재개합니다.");
             progressService.save(activeProgress);
@@ -122,6 +131,10 @@ public class ReportPipelineService {
                 ? "detail_page_final_report_v2_image"
                 : "detail_page_final_report_v1";
 
+        if (reportJobId != null) {
+            jobService.prepareSteps(reportJobId, hasImages);
+        }
+
         // selectedCount는 app.pipeline.selected-count 설정값 사용 (기본 30, 운영 시 100)
         if (regenerateFromScratch) {
             saveService.clearReportArtifacts(orderId);
@@ -137,11 +150,13 @@ public class ReportPipelineService {
         try {
             List<PipelineStep> steps = new ArrayList<>();
             steps.add(new PipelineStep(
+                    "crawl",
                     "URL 페이지 크롤링 중",
                     () -> queryService.hasPageSnapshot(orderId),
                     () -> runPython("crawl_page_snapshot.py", "--order-id", orderId.toString())
             ));
             steps.add(new PipelineStep(
+                    "shopping",
                     "네이버 쇼핑 경쟁 상품 분석 중",
                     () -> queryService.hasReportShoppingAnalysis(orderId),
                     () -> {
@@ -157,6 +172,7 @@ public class ReportPipelineService {
                         .map(p -> p.toAbsolutePath().toString())
                         .toList();
                 steps.add(new PipelineStep(
+                        "image_analysis",
                         "이미지 분석 중 (Gemini)",
                         () -> queryService.hasImageAnalysesForPaths(orderId, expectedImagePaths),
                         () -> {
@@ -171,31 +187,35 @@ public class ReportPipelineService {
             }
 
             steps.add(new PipelineStep(
+                    "target_profile",
                     "상품 타겟 프로필 생성 중",
                     () -> queryService.hasTargetProfile(orderId, profileVersion),
                     () -> pipelineJava.generateTargetProfile(orderId, profileVersion)
             ));
             steps.add(new PipelineStep(
+                    "persona_selection",
                     "페르소나 " + selectedCount + "명 선별 중",
                     () -> queryService.countSelectedPersonasForLatestTargetProfile(orderId, profileVersion) >= selectedCount,
                     () -> pipelineJava.selectPersonas(orderId, selectedCount, personaCandidateLimit, true)
             ));
             steps.add(new PipelineStep(
+                    "persona_reactions",
                     "페르소나 반응 생성 중",
                     () -> queryService.hasCompleteReactions(orderId, responseVersion),
                     () -> pipelineJava.generateReactions(orderId, responseVersion, REACTION_BATCH_SIZE, true,
-                            () -> progressService.isStopRequested(orderId))
+                            () -> isStopRequested(orderId, reportJobId, jobLeaseDuration))
             ));
             steps.add(new PipelineStep(
+                    "final_report",
                     "최종 리포트 취합 중",
                     () -> queryService.hasFinalReport(orderId, reportVersion),
                     () -> pipelineJava.generateFinalReport(orderId, responseVersion, reportVersion)
             ));
 
             for (PipelineStep step : steps) {
-                throwIfStopRequested(orderId);
-                runStep(progress, step);
-                throwIfStopRequested(orderId);
+                throwIfStopRequested(orderId, reportJobId, jobLeaseDuration);
+                runStep(progress, step, reportJobId, jobLeaseDuration);
+                throwIfStopRequested(orderId, reportJobId, jobLeaseDuration);
             }
 
             progress.complete();
@@ -203,39 +223,76 @@ public class ReportPipelineService {
             orderService.markCompleted(orderId);
             log.info("파이프라인 전체 완료 orderId={}, responseVersion={}, reportVersion={}, selectedCount={}",
                     orderId, responseVersion, reportVersion, selectedCount);
+            return PipelineProgress.STATUS_COMPLETED;
 
         } catch (PipelineStopRequestedException e) {
             log.info("파이프라인 중지 orderId={}: {}", orderId, e.getMessage());
             progress.stop(e.getMessage());
             progressService.save(progress);
             orderService.markStopped(orderId);
+            return PipelineProgress.STATUS_STOPPED;
         } catch (Exception e) {
             log.error("파이프라인 예외 orderId={}: {}", orderId, e.getMessage(), e);
             progress.fail(e.getMessage());
             progressService.save(progress);
             orderService.markFailed(orderId);
+            return PipelineProgress.STATUS_FAILED;
         }
     }
 
-    private void throwIfStopRequested(Long orderId) {
-        if (progressService.isStopRequested(orderId)) {
+    private void throwIfStopRequested(Long orderId, Long reportJobId, Duration jobLeaseDuration) {
+        if (isStopRequested(orderId, reportJobId, jobLeaseDuration)) {
             throw new PipelineStopRequestedException("사용자 요청으로 리포트 생성이 중지되었습니다.");
         }
     }
 
+    private boolean isStopRequested(Long orderId, Long reportJobId, Duration jobLeaseDuration) {
+        if (reportJobId != null) {
+            jobService.heartbeat(reportJobId, jobLeaseDuration);
+            if (jobService.isCancelRequested(reportJobId)) {
+                return true;
+            }
+        }
+        return progressService.isStopRequested(orderId);
+    }
+
     /** 완료 산출물이 있으면 스킵하고, 실행 후에도 산출물을 다시 확인한다. */
-    private void runStep(PipelineProgress progress, PipelineStep step) {
+    private void runStep(PipelineProgress progress, PipelineStep step, Long reportJobId, Duration jobLeaseDuration) {
         if (step.isComplete()) {
             progress.advanceStep("완료됨 - " + step.name());
             progressService.save(progress);
+            if (reportJobId != null) {
+                jobService.heartbeat(reportJobId, jobLeaseDuration);
+                jobService.markStepSkipped(reportJobId, step.key());
+            }
             log.info("[pipeline:skip] {}", step.name());
             return;
         }
         progress.advanceStep(step.name());
         progressService.save(progress);
-        step.task().run();
-        if (!step.isComplete()) {
-            throw new RuntimeException("단계 완료 산출물을 확인하지 못했습니다: " + step.name());
+        if (reportJobId != null) {
+            jobService.heartbeat(reportJobId, jobLeaseDuration);
+            jobService.markStepRunning(reportJobId, step.key());
+        }
+        try {
+            step.task().run();
+            if (!step.isComplete()) {
+                throw new RuntimeException("단계 완료 산출물을 확인하지 못했습니다: " + step.name());
+            }
+            if (reportJobId != null) {
+                jobService.heartbeat(reportJobId, jobLeaseDuration);
+                jobService.markStepCompleted(reportJobId, step.key());
+            }
+        } catch (PipelineStopRequestedException e) {
+            if (reportJobId != null) {
+                jobService.markStepStopped(reportJobId, step.key(), e.getMessage());
+            }
+            throw e;
+        } catch (Exception e) {
+            if (reportJobId != null) {
+                jobService.markStepFailed(reportJobId, step.key(), e.getMessage());
+            }
+            throw e;
         }
     }
 
@@ -285,7 +342,7 @@ public class ReportPipelineService {
         }
     }
 
-    private record PipelineStep(String name, BooleanSupplier completionCheck, Runnable task) {
+    private record PipelineStep(String key, String name, BooleanSupplier completionCheck, Runnable task) {
         boolean isComplete() {
             return completionCheck.getAsBoolean();
         }

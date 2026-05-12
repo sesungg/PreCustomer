@@ -77,6 +77,8 @@ public class DeepSeekService {
         String message = collectMessages(e).toLowerCase();
         return message.contains("read timed out")
                 || message.contains("timeout")
+                || message.contains("응답에 choices가 없습니다")
+                || message.contains("error while extracting response")
                 || message.contains("service is too busy")
                 || message.contains("service_unavailable")
                 || message.contains("internal_error")

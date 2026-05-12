@@ -37,6 +37,11 @@ app:
     persona-candidate-limit: ${REPORT_PERSONA_CANDIDATE_LIMIT:50000}
     reaction-concurrency: ${REPORT_REACTION_CONCURRENCY:3}
     stale-timeout-minutes: ${REPORT_PIPELINE_STALE_TIMEOUT_MINUTES:60}
+    worker-enabled: ${REPORT_PIPELINE_WORKER_ENABLED:true}
+    worker-poll-ms: ${REPORT_PIPELINE_WORKER_POLL_MS:3000}
+    worker-lease-minutes: ${REPORT_PIPELINE_WORKER_LEASE_MINUTES:240}
+    retry-base-delay-seconds: ${REPORT_PIPELINE_RETRY_BASE_DELAY_SECONDS:30}
+    retry-max-delay-seconds: ${REPORT_PIPELINE_RETRY_MAX_DELAY_SECONDS:300}
     selected-count: ${REPORT_SELECTED_COUNT:30}  # 운영 시 100으로 변경 (또는 환경변수로 주입)
     gemini-api-key: ${GEMINI_API_KEY:}
   deepseek:
@@ -104,6 +109,9 @@ spring:
     open-in-view: false
   thymeleaf:
     cache: false
+app:
+  pipeline:
+    worker-enabled: false
 
 ---
 spring:
