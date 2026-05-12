@@ -52,3 +52,19 @@ dependencies {
 tasks.named('test') {
     useJUnitPlatform()
 }
+
+tasks.register('bootRunWeb', org.springframework.boot.gradle.tasks.run.BootRun) {
+    group = 'application'
+    description = 'Run the admin/customer web process without the report worker.'
+    mainClass = 'com.example.personareport.PersonaReportApplication'
+    classpath = sourceSets.main.runtimeClasspath
+    args '--spring.profiles.active=local,web'
+}
+
+tasks.register('bootRunWorker', org.springframework.boot.gradle.tasks.run.BootRun) {
+    group = 'application'
+    description = 'Run the report job worker process without starting an HTTP server.'
+    mainClass = 'com.example.personareport.PersonaReportApplication'
+    classpath = sourceSets.main.runtimeClasspath
+    args '--spring.profiles.active=local,worker'
+}

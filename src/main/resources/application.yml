@@ -37,8 +37,9 @@ app:
     persona-candidate-limit: ${REPORT_PERSONA_CANDIDATE_LIMIT:50000}
     reaction-concurrency: ${REPORT_REACTION_CONCURRENCY:3}
     stale-timeout-minutes: ${REPORT_PIPELINE_STALE_TIMEOUT_MINUTES:60}
-    worker-enabled: ${REPORT_PIPELINE_WORKER_ENABLED:true}
+    worker-enabled: ${REPORT_PIPELINE_WORKER_ENABLED:false}
     worker-poll-ms: ${REPORT_PIPELINE_WORKER_POLL_MS:3000}
+    worker-initial-delay-ms: ${REPORT_PIPELINE_WORKER_INITIAL_DELAY_MS:0}
     worker-lease-minutes: ${REPORT_PIPELINE_WORKER_LEASE_MINUTES:240}
     retry-base-delay-seconds: ${REPORT_PIPELINE_RETRY_BASE_DELAY_SECONDS:30}
     retry-max-delay-seconds: ${REPORT_PIPELINE_RETRY_MAX_DELAY_SECONDS:300}
@@ -82,6 +83,9 @@ spring:
     open-in-view: false
   thymeleaf:
     cache: false
+app:
+  pipeline:
+    worker-enabled: ${REPORT_PIPELINE_WORKER_ENABLED:true}
 
 server:
   port: 8080
@@ -130,3 +134,31 @@ spring:
 
 server:
   port: ${PORT:8080}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: web
+  application:
+    name: precustomer-web
+  main:
+    web-application-type: servlet
+app:
+  pipeline:
+    worker-enabled: ${REPORT_PIPELINE_WORKER_ENABLED:false}
+server:
+  port: ${PORT:8080}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: worker
+  application:
+    name: precustomer-report-worker
+  main:
+    web-application-type: none
+app:
+  pipeline:
+    worker-enabled: ${REPORT_PIPELINE_WORKER_ENABLED:true}

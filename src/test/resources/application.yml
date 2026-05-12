@@ -25,9 +25,35 @@ app:
     import-path: ./data/personas.full.jsonl
     import-batch-size: 3000
     import-source: NEMOTRON
+  pipeline:
+    worker-enabled: false
+    worker-poll-ms: 600000
+    worker-initial-delay-ms: 3600000
   deepseek:
     base-url: https://api.deepseek.com
     model: deepseek-v4-flash
     api-key: ${DEEPSEEK_API_KEY:}
     temperature: 0.4
     max-tokens: 6000
+
+---
+spring:
+  config:
+    activate:
+      on-profile: web
+  main:
+    web-application-type: servlet
+app:
+  pipeline:
+    worker-enabled: false
+
+---
+spring:
+  config:
+    activate:
+      on-profile: worker
+  main:
+    web-application-type: none
+app:
+  pipeline:
+    worker-enabled: true

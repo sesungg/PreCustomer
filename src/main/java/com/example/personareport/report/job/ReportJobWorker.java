@@ -41,7 +41,9 @@ public class ReportJobWorker {
     @Value("${app.pipeline.retry-max-delay-seconds:300}")
     private long retryMaxDelaySeconds;
 
-    @Scheduled(fixedDelayString = "${app.pipeline.worker-poll-ms:3000}")
+    @Scheduled(
+            fixedDelayString = "${app.pipeline.worker-poll-ms:3000}",
+            initialDelayString = "${app.pipeline.worker-initial-delay-ms:0}")
     public void poll() {
         Duration lease = Duration.ofMinutes(leaseMinutes);
         jobService.claimNextJob(workerId, lease)
