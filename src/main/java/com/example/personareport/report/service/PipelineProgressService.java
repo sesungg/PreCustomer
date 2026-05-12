@@ -39,6 +39,19 @@ public class PipelineProgressService {
                 .orElse(false);
     }
 
+    /** 진행 중인 파이프라인을 사용자 관점에서 즉시 중지 상태로 전환한다. */
+    @Transactional
+    public boolean stop(Long orderId, String message) {
+        return progressRepository.findById(orderId)
+                .filter(progress -> !PipelineProgress.STATUS_COMPLETED.equals(progress.getStatus()))
+                .map(progress -> {
+                    progress.stop(message);
+                    progressRepository.save(progress);
+                    return true;
+                })
+                .orElse(false);
+    }
+
     /** 중지 요청 여부를 최신 DB 상태 기준으로 조회한다. */
     @Transactional(readOnly = true)
     public boolean isStopRequested(Long orderId) {

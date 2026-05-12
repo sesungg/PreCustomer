@@ -98,11 +98,11 @@ public class PipelineProgress extends BaseTimeEntity {
     }
 
     public boolean isStopRequested() {
-        return STATUS_STOP_REQUESTED.equals(status);
+        return STATUS_STOP_REQUESTED.equals(status) || STATUS_STOPPED.equals(status);
     }
 
     public boolean isActive() {
-        return isInProgress() || isStopRequested();
+        return isInProgress() || STATUS_STOP_REQUESTED.equals(status);
     }
 
     public boolean isTerminal() {

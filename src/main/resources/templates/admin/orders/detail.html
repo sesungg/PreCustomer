@@ -245,6 +245,7 @@
                             bar.className = 'progress-bar-fill';
                             if (data.status === 'COMPLETED') bar.className += ' complete';
                             if (data.status === 'FAILED') bar.className += ' failed';
+                            if (data.status === 'STOPPED') bar.className += ' stopped';
                         }
                         if (title) {
                             if (data.status === 'COMPLETED') title.textContent = '리포트 생성 완료';

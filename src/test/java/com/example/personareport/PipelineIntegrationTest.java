@@ -151,6 +151,24 @@ class PipelineIntegrationTest {
         assertThat(stopped).isPresent();
         assertThat(stopped.get().getStatus()).isEqualTo(PipelineProgress.STATUS_STOPPED);
         assertThat(stopped.get().getErrorMessage()).contains("사용자 요청");
+        assertThat(progressService.isStopRequested(996L)).isTrue();
+    }
+
+    @Test
+    void pipelineProgress_stop_marksTerminalStoppedImmediately() {
+        var progress = PipelineProgress.start(995L, 5);
+        progress.advanceStep("최종 리포트 취합 중");
+        progressService.save(progress);
+
+        boolean accepted = progressService.stop(995L, "사용자 요청으로 중지");
+
+        var stopped = progressService.findById(995L);
+        assertThat(accepted).isTrue();
+        assertThat(stopped).isPresent();
+        assertThat(stopped.get().getStatus()).isEqualTo(PipelineProgress.STATUS_STOPPED);
+        assertThat(stopped.get().isTerminal()).isTrue();
+        assertThat(stopped.get().isActive()).isFalse();
+        assertThat(progressService.isStopRequested(995L)).isTrue();
     }
 
     @Test

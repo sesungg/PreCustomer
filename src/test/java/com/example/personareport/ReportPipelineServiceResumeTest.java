@@ -84,20 +84,21 @@ class ReportPipelineServiceResumeTest {
     }
 
     @Test
-    void requestStop_marksInProgressAsStopRequested() {
+    void requestStop_marksInProgressAsStoppedForOperator() {
         Long orderId = 11L;
         var progress = PipelineProgress.start(orderId, 8);
 
         when(progressService.findById(orderId)).thenReturn(Optional.of(progress));
-        when(progressService.requestStop(orderId)).thenAnswer(invocation -> {
-            progress.requestStop();
+        when(progressService.stop(eq(orderId), anyString())).thenAnswer(invocation -> {
+            progress.stop(invocation.getArgument(1));
             return true;
         });
 
         boolean accepted = service.requestStop(orderId);
 
         assertThat(accepted).isTrue();
-        assertThat(progress.getStatus()).isEqualTo(PipelineProgress.STATUS_STOP_REQUESTED);
+        assertThat(progress.getStatus()).isEqualTo(PipelineProgress.STATUS_STOPPED);
+        verify(orderService).markStopped(orderId);
     }
 
     @Test

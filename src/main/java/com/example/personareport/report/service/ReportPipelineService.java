@@ -86,20 +86,21 @@ public class ReportPipelineService {
         return runPipeline(orderId, imagePaths, regenerateFromScratch, reportJobId, jobLeaseDuration);
     }
 
-    /** 실행 중인 파이프라인에 graceful stop을 요청한다. */
+    /** 실행 중인 파이프라인을 사용자 관점에서 중지 상태로 전환하고 worker에는 협조적 중지를 요청한다. */
     public boolean requestStop(Long orderId) {
         var progressOpt = progressService.findById(orderId);
         if (progressOpt.isEmpty() || progressOpt.get().isTerminal()) {
             return false;
         }
         var progress = progressOpt.get();
-        if (progress.isStale(Duration.ofMinutes(staleTimeoutMinutes))) {
-            progress.stop("오래 응답하지 않는 리포트 생성을 중지 처리했습니다.");
-            progressService.save(progress);
+        String message = progress.isStale(Duration.ofMinutes(staleTimeoutMinutes))
+                ? "오래 응답하지 않는 리포트 생성을 중지 처리했습니다."
+                : "사용자 요청으로 리포트 생성이 중지되었습니다.";
+        boolean stopped = progressService.stop(orderId, message);
+        if (stopped) {
             orderService.markStopped(orderId);
-            return true;
         }
-        return progressService.requestStop(orderId);
+        return stopped;
     }
 
     private String runPipeline(Long orderId, List<Path> imagePaths, boolean regenerateFromScratch,
@@ -232,6 +233,13 @@ public class ReportPipelineService {
             orderService.markStopped(orderId);
             return PipelineProgress.STATUS_STOPPED;
         } catch (Exception e) {
+            if (isStopRequested(orderId, reportJobId, jobLeaseDuration)) {
+                log.info("파이프라인 예외를 중지 요청으로 처리 orderId={}: {}", orderId, e.getMessage());
+                progress.stop("사용자 요청으로 리포트 생성이 중지되었습니다.");
+                progressService.save(progress);
+                orderService.markStopped(orderId);
+                return PipelineProgress.STATUS_STOPPED;
+            }
             log.error("파이프라인 예외 orderId={}: {}", orderId, e.getMessage(), e);
             progress.fail(e.getMessage());
             progressService.save(progress);

@@ -256,6 +256,7 @@ psql -h localhost -U postgres -d precustomer -f docs/sql/05_add_pipeline_entity_
 psql -h localhost -U postgres -d precustomer -f docs/sql/06_pipeline_performance_indexes.sql
 psql -h localhost -U postgres -d precustomer -f docs/sql/07_report_job_queue.sql
 psql -h localhost -U postgres -d precustomer -f docs/sql/07_create_normalized_score_mv.sql
+psql -h localhost -U postgres -d precustomer -f docs/sql/08_allow_stopped_order_status.sql
 ```
 
 ---

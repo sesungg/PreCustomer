@@ -136,9 +136,23 @@ public class AdminOrderController {
     public ResponseEntity<Map<String, Object>> getProgress(@PathVariable Long id) {
         Optional<PipelineProgress> opt = progressService.findById(id);
         var latestJob = reportJobService.findLatestForOrder(id);
+        if (opt.isEmpty() && latestJob.isPresent()
+                && ReportJobStatus.STOPPED.equals(latestJob.get().getStatus())) {
+            var job = latestJob.get();
+            return ResponseEntity.ok(Map.of(
+                    "status", ReportJobStatus.STOPPED,
+                    "currentStep", 0,
+                    "totalSteps", 0,
+                    "currentStepName", "중지됨",
+                    "errorMessage", job.getErrorMessage() != null ? job.getErrorMessage() : "",
+                    "completed", true
+            ));
+        }
         if (latestJob.isPresent()
                 && ReportJobStatus.ACTIVE.contains(latestJob.get().getStatus())
-                && (opt.isEmpty() || opt.get().isTerminal())) {
+                && (opt.isEmpty()
+                || (opt.get().isTerminal()
+                && !PipelineProgress.STATUS_STOPPED.equals(opt.get().getStatus())))) {
             var job = latestJob.get();
             String currentStepName = job.getAttemptCount() > 0
                     ? "재시도 대기 중"
