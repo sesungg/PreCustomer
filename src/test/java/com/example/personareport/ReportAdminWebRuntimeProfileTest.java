@@ -20,14 +20,14 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.core.env.Environment;
 import org.springframework.test.context.ActiveProfiles;
 
-@ActiveProfiles({"h2", "web"})
+@ActiveProfiles({"h2", "admin-web"})
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.NONE,
         properties = {
                 "app.persona.import-enabled=false",
                 "app.persona.sample-import-enabled=false"
         })
-class ReportWebRuntimeProfileTest {
+class ReportAdminWebRuntimeProfileTest {
 
     @Autowired
     private Environment environment;
@@ -42,17 +42,17 @@ class ReportWebRuntimeProfileTest {
     private NaverShoppingFeignClient naverFeign;
 
     @Test
-    void webProfileKeepsPublicAndAdminControllersWithoutWorker() {
-        assertThat(environment.getProperty("app.pipeline.worker-enabled", Boolean.class)).isFalse();
-        assertThat(environment.getProperty("app.web.public-enabled", Boolean.class)).isTrue();
+    void adminWebProfileExposesOnlyAdminControllers() {
+        assertThat(environment.getProperty("app.web.public-enabled", Boolean.class)).isFalse();
         assertThat(environment.getProperty("app.web.admin-enabled", Boolean.class)).isTrue();
-        assertThat(context.getBeanNamesForType(ReportJobWorker.class)).isEmpty();
-        assertThat(context.getBeanNamesForType(LandingController.class)).hasSize(1);
-        assertThat(context.getBeanNamesForType(OrderController.class)).hasSize(1);
+        assertThat(environment.getProperty("app.pipeline.worker-enabled", Boolean.class)).isFalse();
+        assertThat(context.getBeanNamesForType(LandingController.class)).isEmpty();
+        assertThat(context.getBeanNamesForType(OrderController.class)).isEmpty();
         assertThat(context.getBeanNamesForType(AdminOrderController.class)).hasSize(1);
         assertThat(context.getBeanNamesForType(ReportViewController.class)).hasSize(1);
         assertThat(context.getBeanNamesForType(ReportPdfController.class)).hasSize(1);
         assertThat(context.getBeanNamesForType(AdminMvController.class)).hasSize(1);
         assertThat(context.getBeanNamesForType(ShoppingSearchController.class)).hasSize(1);
+        assertThat(context.getBeanNamesForType(ReportJobWorker.class)).isEmpty();
     }
 }

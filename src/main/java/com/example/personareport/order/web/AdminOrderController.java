@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 
 /** 관리자 주문 관리 화면. 주문 목록, 상세, 입금확인, 리포트생성, 진행상황 폴링. */
 @Controller
+@ConditionalOnProperty(prefix = "app.web", name = "admin-enabled", havingValue = "true", matchIfMissing = true)
 @RequestMapping("/admin/orders")
 @RequiredArgsConstructor
 public class AdminOrderController {

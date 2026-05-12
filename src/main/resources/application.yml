@@ -17,6 +17,9 @@ spring:
       max-request-size: 50MB
 
 app:
+  web:
+    public-enabled: ${APP_WEB_PUBLIC_ENABLED:true}
+    admin-enabled: ${APP_WEB_ADMIN_ENABLED:true}
   upload:
     dir: ./uploads
     allowed-types: image/webp,image/png,image/jpeg
@@ -154,11 +157,50 @@ server:
 spring:
   config:
     activate:
+      on-profile: public-web
+  application:
+    name: precustomer-public-web
+  main:
+    web-application-type: servlet
+app:
+  web:
+    public-enabled: ${APP_WEB_PUBLIC_ENABLED:true}
+    admin-enabled: ${APP_WEB_ADMIN_ENABLED:false}
+  pipeline:
+    worker-enabled: ${REPORT_PIPELINE_WORKER_ENABLED:false}
+server:
+  port: ${PUBLIC_PORT:${PORT:8080}}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: admin-web
+  application:
+    name: precustomer-admin-web
+  main:
+    web-application-type: servlet
+app:
+  web:
+    public-enabled: ${APP_WEB_PUBLIC_ENABLED:false}
+    admin-enabled: ${APP_WEB_ADMIN_ENABLED:true}
+  pipeline:
+    worker-enabled: ${REPORT_PIPELINE_WORKER_ENABLED:false}
+server:
+  port: ${ADMIN_PORT:8081}
+
+---
+spring:
+  config:
+    activate:
       on-profile: worker
   application:
     name: precustomer-report-worker
   main:
     web-application-type: none
 app:
+  web:
+    public-enabled: false
+    admin-enabled: false
   pipeline:
     worker-enabled: ${REPORT_PIPELINE_WORKER_ENABLED:true}

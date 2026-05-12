@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.commonmark.node.Node;
 import org.commonmark.parser.Parser;
 import org.commonmark.renderer.html.HtmlRenderer;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,6 +24,7 @@ import org.xhtmlrenderer.pdf.ITextRenderer;
  * report_markdown 이 비어 있을 경우 텍스트 섹션을 조합한 fallback HTML을 사용한다.
  */
 @Controller
+@ConditionalOnProperty(prefix = "app.web", name = "admin-enabled", havingValue = "true", matchIfMissing = true)
 @RequestMapping("/admin/reports")
 @RequiredArgsConstructor
 public class ReportPdfController {

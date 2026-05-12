@@ -17,6 +17,9 @@ spring:
     cache: false
 
 app:
+  web:
+    public-enabled: true
+    admin-enabled: true
   ai:
     provider: mock
   persona:
@@ -44,6 +47,37 @@ spring:
   main:
     web-application-type: servlet
 app:
+  web:
+    public-enabled: true
+    admin-enabled: true
+  pipeline:
+    worker-enabled: false
+
+---
+spring:
+  config:
+    activate:
+      on-profile: public-web
+  main:
+    web-application-type: servlet
+app:
+  web:
+    public-enabled: true
+    admin-enabled: false
+  pipeline:
+    worker-enabled: false
+
+---
+spring:
+  config:
+    activate:
+      on-profile: admin-web
+  main:
+    web-application-type: servlet
+app:
+  web:
+    public-enabled: false
+    admin-enabled: true
   pipeline:
     worker-enabled: false
 
@@ -55,5 +89,8 @@ spring:
   main:
     web-application-type: none
 app:
+  web:
+    public-enabled: false
+    admin-enabled: false
   pipeline:
     worker-enabled: true

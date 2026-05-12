@@ -7,11 +7,13 @@ import com.example.personareport.modules.shopping.service.ShoppingSearchService;
 import jakarta.validation.Valid;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 /** 네이버 쇼핑 검색 REST API. 검색 실행, 후보 조회/선택, 가격/분포 분석, 리포트 context. */
 @RestController
+@ConditionalOnProperty(prefix = "app.web", name = "admin-enabled", havingValue = "true", matchIfMissing = true)
 @RequestMapping("/api/shopping/naver")
 @RequiredArgsConstructor
 public class ShoppingSearchController {

@@ -55,10 +55,26 @@ tasks.named('test') {
 
 tasks.register('bootRunWeb', org.springframework.boot.gradle.tasks.run.BootRun) {
     group = 'application'
-    description = 'Run the admin/customer web process without the report worker.'
+    description = 'Run the combined public/admin web process without the report worker.'
     mainClass = 'com.example.personareport.PersonaReportApplication'
     classpath = sourceSets.main.runtimeClasspath
     args '--spring.profiles.active=local,web'
+}
+
+tasks.register('bootRunPublicWeb', org.springframework.boot.gradle.tasks.run.BootRun) {
+    group = 'application'
+    description = 'Run the public customer web process without admin routes or the report worker.'
+    mainClass = 'com.example.personareport.PersonaReportApplication'
+    classpath = sourceSets.main.runtimeClasspath
+    args '--spring.profiles.active=local,public-web'
+}
+
+tasks.register('bootRunAdminWeb', org.springframework.boot.gradle.tasks.run.BootRun) {
+    group = 'application'
+    description = 'Run the admin web process without public routes or the report worker.'
+    mainClass = 'com.example.personareport.PersonaReportApplication'
+    classpath = sourceSets.main.runtimeClasspath
+    args '--spring.profiles.active=local,admin-web'
 }
 
 tasks.register('bootRunWorker', org.springframework.boot.gradle.tasks.run.BootRun) {
