@@ -37,11 +37,11 @@ def run(conn, args):
     order = fetch_order(conn, args.order_id)
     if not order:
         print(f"[SKIP] order_id={args.order_id} not found", file=sys.stderr)
-        return
+        sys.exit(1)
 
     page_url = (order.get("page_url") or "").strip()
     if not page_url:
-        print(f"[SKIP] order_id={args.order_id} has no page_url", file=sys.stderr)
+        save_fallback_snapshot(conn, args.order_id, order, "NO_PAGE_URL", "주문에 상세페이지 URL이 없습니다.")
         return
 
     # 기존 snapshot 있으면 스킵
@@ -57,6 +57,7 @@ def run(conn, args):
     except Exception as e:
         print(f"[FAIL] HTTP error: {e}", file=sys.stderr)
         if not args.force:
+            save_fallback_snapshot(conn, args.order_id, order, "HTTP_ERROR", str(e))
             return
         resp = None
 
@@ -108,6 +109,58 @@ def run(conn, args):
         if rs:
             extra += f", rating={rs}"
         print(f"[OK] page_snapshot created for order_id={args.order_id}, images={len(image_urls)}{extra}")
+
+
+def save_fallback_snapshot(conn, order_id, order, reason, error_message):
+    """크롤링이 막혀도 이후 이미지/주문 정보 기반 분석을 진행할 수 있도록 최소 snapshot을 저장한다."""
+    page_url = (order.get("page_url") or "").strip() or f"manual://report-order/{order_id}"
+    project_name = (order.get("project_name") or "").strip()
+    price_text = order.get("price_text")
+    visible_text_parts = [
+        f"상품명: {project_name}" if project_name else None,
+        f"한 줄 설명: {order.get('one_line_description')}" if order.get("one_line_description") else None,
+        f"상세 설명: {order.get('detail_description')}" if order.get("detail_description") else None,
+        f"가격: {price_text}" if price_text else None,
+        f"타겟 고객: {order.get('target_customer')}" if order.get("target_customer") else None,
+        f"핵심 질문: {order.get('main_question')}" if order.get("main_question") else None,
+        f"원본 URL: {page_url}" if page_url else None,
+    ]
+    visible_text = "\n".join(part for part in visible_text_parts if part)
+    raw_meta = {
+        "fallbackSource": "report_order",
+        "fallbackReason": reason,
+        "crawlError": error_message,
+    }
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO page_snapshot (
+                report_order_id, page_url, source_site, snapshot_status,
+                page_title, product_title, price_text,
+                visible_text, extracted_text_summary, image_urls,
+                raw_meta_json, captured_at
+            ) VALUES (%s,%s,%s,%s, %s,%s,%s, %s,%s,%s, %s::jsonb, %s)
+            ON CONFLICT (report_order_id) DO UPDATE SET
+                page_url = EXCLUDED.page_url,
+                source_site = EXCLUDED.source_site,
+                snapshot_status = EXCLUDED.snapshot_status,
+                page_title = EXCLUDED.page_title,
+                product_title = EXCLUDED.product_title,
+                price_text = EXCLUDED.price_text,
+                visible_text = EXCLUDED.visible_text,
+                extracted_text_summary = EXCLUDED.extracted_text_summary,
+                image_urls = EXCLUDED.image_urls,
+                raw_meta_json = EXCLUDED.raw_meta_json,
+                captured_at = EXCLUDED.captured_at
+            """,
+            (
+                order_id, page_url, _extract_domain(page_url) or "manual", "FALLBACK",
+                project_name, project_name, price_text,
+                visible_text, visible_text[:2000] if visible_text else None, psycopg2.extras.Json([]),
+                psycopg2.extras.Json(raw_meta), datetime.now(),
+            ),
+        )
+    print(f"[FALLBACK] page_snapshot saved for order_id={order_id}, reason={reason}")
 
 
 def fetch_order(conn, order_id):
