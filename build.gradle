@@ -1,86 +1,96 @@
 plugins {
-    id 'java'
-    id 'org.springframework.boot' version '3.3.5'
-    id 'io.spring.dependency-management' version '1.1.6'
+    id 'base'
+    id 'org.springframework.boot' version '3.3.5' apply false
+    id 'io.spring.dependency-management' version '1.1.6' apply false
 }
 
-group = 'com.example'
-version = '0.0.1-SNAPSHOT'
+allprojects {
+    group = 'com.example'
+    version = '0.0.1-SNAPSHOT'
+}
 
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
+configure(subprojects.findAll { it.buildFile.isFile() }) {
+    apply plugin: 'java'
+    apply plugin: 'io.spring.dependency-management'
+
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(17)
+        }
+    }
+
+    configurations {
+        compileOnly {
+            extendsFrom annotationProcessor
+        }
+    }
+
+    tasks.withType(Test).configureEach {
+        useJUnitPlatform()
     }
 }
 
-configurations {
-    compileOnly {
-        extendsFrom annotationProcessor
+def registerRootBootRun(String taskName, String modulePath, String mainClassName, String profiles, String taskDescription) {
+    tasks.register(taskName, org.springframework.boot.gradle.tasks.run.BootRun) {
+        group = 'application'
+        description = taskDescription
+        mainClass = mainClassName
+        classpath = project(modulePath).sourceSets.main.runtimeClasspath
+        args "--spring.profiles.active=${profiles}"
     }
 }
 
-dependencies {
-    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-    implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
-    implementation 'org.springframework.boot:spring-boot-starter-validation'
-    implementation 'org.springframework.boot:spring-boot-starter-web'
-    implementation 'org.springframework.cloud:spring-cloud-starter-openfeign:4.1.3'
-    implementation 'com.querydsl:querydsl-jpa:5.1.0:jakarta'
+registerRootBootRun(
+        'bootRun',
+        ':apps:combined-web',
+        'com.example.personareport.combined.CombinedWebApplication',
+        'local,web',
+        'Run the combined public/admin web process.'
+)
 
-    compileOnly 'org.projectlombok:lombok'
-    annotationProcessor 'org.projectlombok:lombok'
-    annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
-    annotationProcessor 'com.querydsl:querydsl-apt:5.1.0:jakarta'
-    annotationProcessor 'jakarta.annotation:jakarta.annotation-api'
-    annotationProcessor 'jakarta.persistence:jakarta.persistence-api'
+registerRootBootRun(
+        'bootRunWeb',
+        ':apps:combined-web',
+        'com.example.personareport.combined.CombinedWebApplication',
+        'local,web',
+        'Run the combined public/admin web process without the report worker.'
+)
 
-    runtimeOnly 'com.h2database:h2'
-    runtimeOnly 'org.postgresql:postgresql'
+registerRootBootRun(
+        'bootRunPublicWeb',
+        ':apps:public-web',
+        'com.example.personareport.publicweb.PublicWebApplication',
+        'local,public-web',
+        'Run the public customer web process without admin routes or the report worker.'
+)
 
-    // Markdown → HTML 변환 (CommonMark)
-    implementation 'org.commonmark:commonmark:0.22.0'
-    // HTML → PDF 변환 (OpenPDF + Flying Saucer) - Java 17 호환 버전
-    implementation('com.github.librepdf:openpdf:1.4.2')
-    implementation('org.xhtmlrenderer:flying-saucer-pdf-openpdf:9.4.0') {
-        exclude group: 'com.github.librepdf', module: 'openpdf'
-    }
+registerRootBootRun(
+        'bootRunAdminWeb',
+        ':apps:admin-web',
+        'com.example.personareport.adminweb.AdminWebApplication',
+        'local,admin-web',
+        'Run the admin web process without public routes or the report worker.'
+)
 
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-}
+registerRootBootRun(
+        'bootRunWorker',
+        ':apps:report-worker',
+        'com.example.personareport.worker.ReportWorkerApplication',
+        'local,worker',
+        'Run the report job worker process without starting an HTTP server.'
+)
 
-tasks.named('test') {
-    useJUnitPlatform()
-}
-
-tasks.register('bootRunWeb', org.springframework.boot.gradle.tasks.run.BootRun) {
+tasks.register('bootRunAll') {
     group = 'application'
-    description = 'Run the combined public/admin web process without the report worker.'
-    mainClass = 'com.example.personareport.PersonaReportApplication'
-    classpath = sourceSets.main.runtimeClasspath
-    args '--spring.profiles.active=local,web'
+    description = 'Disabled guard task: run application processes in separate terminals instead.'
+    enabled = false
 }
 
-tasks.register('bootRunPublicWeb', org.springframework.boot.gradle.tasks.run.BootRun) {
-    group = 'application'
-    description = 'Run the public customer web process without admin routes or the report worker.'
-    mainClass = 'com.example.personareport.PersonaReportApplication'
-    classpath = sourceSets.main.runtimeClasspath
-    args '--spring.profiles.active=local,public-web'
-}
-
-tasks.register('bootRunAdminWeb', org.springframework.boot.gradle.tasks.run.BootRun) {
-    group = 'application'
-    description = 'Run the admin web process without public routes or the report worker.'
-    mainClass = 'com.example.personareport.PersonaReportApplication'
-    classpath = sourceSets.main.runtimeClasspath
-    args '--spring.profiles.active=local,admin-web'
-}
-
-tasks.register('bootRunWorker', org.springframework.boot.gradle.tasks.run.BootRun) {
-    group = 'application'
-    description = 'Run the report job worker process without starting an HTTP server.'
-    mainClass = 'com.example.personareport.PersonaReportApplication'
-    classpath = sourceSets.main.runtimeClasspath
-    args '--spring.profiles.active=local,worker'
+tasks.register('bootJarAll') {
+    group = 'build'
+    description = 'Build all executable application jars.'
+    dependsOn ':apps:combined-web:bootJar',
+            ':apps:public-web:bootJar',
+            ':apps:admin-web:bootJar',
+            ':apps:report-worker:bootJar'
 }

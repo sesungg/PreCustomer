@@ -1,0 +1,71 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: precustomer
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  public-web:
+    build:
+      context: .
+      args:
+        JAR_FILE: apps/public-web/build/libs/precustomer-public-web-0.0.1-SNAPSHOT.jar
+    environment:
+      SPRING_PROFILES_ACTIVE: prod,public-web
+      DATABASE_URL: jdbc:postgresql://postgres:5432/precustomer
+      DATABASE_USERNAME: postgres
+      DATABASE_PASSWORD: postgres
+      PUBLIC_PORT: 8080
+    depends_on:
+      - postgres
+
+  admin-web:
+    build:
+      context: .
+      args:
+        JAR_FILE: apps/admin-web/build/libs/precustomer-admin-web-0.0.1-SNAPSHOT.jar
+    environment:
+      SPRING_PROFILES_ACTIVE: prod,admin-web
+      DATABASE_URL: jdbc:postgresql://postgres:5432/precustomer
+      DATABASE_USERNAME: postgres
+      DATABASE_PASSWORD: postgres
+      ADMIN_PORT: 8081
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-me-before-prod}
+    depends_on:
+      - postgres
+
+  report-worker:
+    build:
+      context: .
+      args:
+        JAR_FILE: apps/report-worker/build/libs/precustomer-report-worker-0.0.1-SNAPSHOT.jar
+    environment:
+      SPRING_PROFILES_ACTIVE: prod,worker
+      DATABASE_URL: jdbc:postgresql://postgres:5432/precustomer
+      DATABASE_USERNAME: postgres
+      DATABASE_PASSWORD: postgres
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      NAVER_SHOPPING_CLIENT_ID: ${NAVER_SHOPPING_CLIENT_ID:-}
+      NAVER_SHOPPING_CLIENT_SECRET: ${NAVER_SHOPPING_CLIENT_SECRET:-}
+    depends_on:
+      - postgres
+
+  gateway:
+    image: nginx:1.27-alpine
+    ports:
+      - "8088:80"
+    volumes:
+      - ./infra/gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - public-web
+      - admin-web
+
+volumes:
+  postgres-data:

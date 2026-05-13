@@ -13,3 +13,9 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = 'precustomer'
+
+include 'modules:precustomer-core'
+include 'apps:combined-web'
+include 'apps:public-web'
+include 'apps:admin-web'
+include 'apps:report-worker'

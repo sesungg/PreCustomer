@@ -1,0 +1,20 @@
+plugins {
+    id 'org.springframework.boot'
+}
+
+dependencies {
+    implementation project(':modules:precustomer-core')
+}
+
+springBoot {
+    mainClass = 'com.example.personareport.worker.ReportWorkerApplication'
+}
+
+bootJar {
+    archiveBaseName = 'precustomer-report-worker'
+}
+
+tasks.named('bootRun') {
+    enabled = false
+    classpath = files()
+}

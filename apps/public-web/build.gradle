@@ -1,0 +1,20 @@
+plugins {
+    id 'org.springframework.boot'
+}
+
+dependencies {
+    implementation project(':modules:precustomer-core')
+}
+
+springBoot {
+    mainClass = 'com.example.personareport.publicweb.PublicWebApplication'
+}
+
+bootJar {
+    archiveBaseName = 'precustomer-public-web'
+}
+
+tasks.named('bootRun') {
+    enabled = false
+    classpath = files()
+}
