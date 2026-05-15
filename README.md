@@ -74,8 +74,9 @@ apps/
   report-worker/   # report_job 처리 worker 실행 JAR
 modules/
   precustomer-contracts/ # 서비스 간 공유 계약
-  precustomer-core/      # 도메인, 서비스, repository, templates, resources, tests
 ```
+
+각 app은 더 이상 공통 core 모듈에 의존하지 않고, 자신의 controller, service, repository, template, resource를 직접 보유합니다.
 
 ---
 

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>관리자 주문 목록</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<header class="site-header">
+    <a class="brand" href="/admin/orders">Admin</a>
+    <a class="header-link" href="/">서비스 화면</a>
+</header>
+
+<main class="page wide">
+    <div class="page-title row-title">
+        <div>
+            <p class="eyebrow">운영 관리</p>
+            <h1>주문 목록</h1>
+        </div>
+        <form class="filter" method="get" action="/admin/orders">
+            <select name="status">
+                <option value="">전체 상태</option>
+                <option th:each="status : ${statuses}" th:value="${status}" th:text="${status.label}" th:selected="${status == selectedStatus}"></option>
+            </select>
+            <button class="button secondary" type="submit">필터</button>
+        </form>
+    </div>
+
+    <div class="table-wrap">
+        <table>
+            <thead>
+            <tr>
+                <th>ID</th>
+                <th>상태</th>
+                <th>이메일</th>
+                <th>프로젝트명</th>
+                <th>유형</th>
+                <th>신청일</th>
+                <th>상세</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="order : ${orders}">
+                <td th:text="${order.id}"></td>
+                <td>
+                    <span class="status"
+                          th:classappend="${#strings.toLowerCase(order.status.name())}"
+                          th:text="${order.status.label}"></span>
+                </td>
+                <td th:text="${order.customerEmail}"></td>
+                <td th:text="${order.projectName}"></td>
+                <td th:text="${order.targetType.label}"></td>
+                <td th:text="${#temporals.format(order.createdAt, 'yyyy-MM-dd HH:mm')}"></td>
+                <td><a th:href="@{/admin/orders/{id}(id=${order.id})}">보기</a></td>
+            </tr>
+            <tr th:if="${#lists.isEmpty(orders)}">
+                <td colspan="7" class="empty">주문이 없습니다.</td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</main>
+</body>
+</html>

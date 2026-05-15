@@ -14,7 +14,6 @@ dependencyResolutionManagement {
 
 rootProject.name = 'precustomer'
 
-include 'modules:precustomer-core'
 include 'modules:precustomer-contracts'
 include 'apps:api-gateway'
 include 'apps:combined-web'

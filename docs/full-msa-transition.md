@@ -24,22 +24,24 @@
 - schema boundary SQL
 - multi-repo export
 - export된 repo별 초기 Git commit
-- core/service/platform CI workflow 생성
+- contracts/service/platform CI workflow 생성
 
 ## 아직 남기는 경계
 
-`precustomer-core`는 shared library로 남긴다. 이 단계에서 shared library를 완전히 없애면 JPA entity, 템플릿, 파이프라인, 테스트를 서비스별로 동시에 재작성해야 하므로 리포트 생성 안정성이 크게 흔들린다.
+`precustomer-core` 모듈은 제거했다. public/admin/worker는 더 이상 공통 app code Gradle 모듈에 의존하지 않고, 공통으로 남기는 코드는 `precustomer-contracts`의 서비스 간 계약으로 제한한다.
 
-다음 단계에서 core를 더 작게 나눌 수 있다.
+이번 단계는 모듈 의존성 제거가 목적이다. 서비스별로 실제로 필요한 코드만 남기는 정리는 DB table ownership과 HTTP/event 통신 경계를 분리할 때 함께 진행한다.
+
+아직 남은 큰 경계는 DB 물리 분리다. 현재는 서비스별 DB 계정과 schema boundary만 먼저 둔 상태이며, 실제 table ownership과 API/event 통신 전환은 다음 단계에서 진행한다.
 
 ```text
-precustomer-order-domain
 precustomer-report-contracts
-precustomer-persona-domain
 precustomer-shopping-contracts
+precustomer-order-events
+precustomer-persona-events
 ```
 
-그 뒤 public/admin/worker는 shared JPA entity 대신 HTTP API 또는 event contract로 통신한다.
+그 뒤 public/admin/worker는 같은 DB table을 직접 공유하지 않고 HTTP API 또는 event contract로 통신한다.
 
 ## 로컬 검증
 
@@ -49,7 +51,6 @@ precustomer-shopping-contracts
 target="$(mktemp -d)"
 ./tools/export-multi-repo-msa.sh "$target"
 (cd "$target/precustomer-contracts" && ./gradlew test)
-(cd "$target/precustomer-core" && ./gradlew test)
 (cd "$target/precustomer-api-gateway" && ./gradlew bootJar)
 (cd "$target/precustomer-public-web" && ./gradlew bootJar)
 (cd "$target/precustomer-admin-web" && ./gradlew bootJar)

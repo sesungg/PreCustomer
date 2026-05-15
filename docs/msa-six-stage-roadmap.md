@@ -1,4 +1,4 @@
-# MSA 6단계 전환 로드맵
+# MSA 전환 로드맵
 
 이 프로젝트는 운영 안정성을 해치지 않도록 단계적으로 MSA 구조로 분리한다.
 
@@ -80,6 +80,16 @@ RabbitMQ/Kafka는 아직 넣지 않는다. 대신 `ReportJobQueue` 포트를 기
 
 별도 auth-service는 아직 만들지 않는다. 관리자 사용자/권한 도메인, refresh token, 서비스 간 인증이 필요해지는 시점에 분리한다. 지금은 gateway가 얇은 인증 진입점 역할을 맡고, admin-web 세션 로그인은 직접 실행/개발용 fallback으로 유지한다.
 
+## 7단계: 공통 core 제거
+
+`precustomer-core` 모듈을 제거하고 app별 코드 소유권을 분리했다.
+
+- `public-web`, `admin-web`, `report-worker`, `combined-web`는 더 이상 공통 core Gradle 모듈에 의존하지 않는다.
+- 각 app은 자신의 controller, service, repository, template, resource를 보유한다.
+- 서비스 간 공유 코드는 `precustomer-contracts`에 남긴다.
+- 아직 DB table은 공유하므로, 서비스별 DB 완전 분리는 다음 단계에서 진행한다.
+- 이번 단계는 모듈 의존성 제거가 목표이며, 서비스별 코드 최소화는 DB/API 경계 분리와 함께 진행한다.
+
 ## 로컬 실행
 
 ```bash
@@ -108,6 +118,6 @@ gateway는 `http://localhost:8088`에서 확인한다.
 1. 관리자 계정을 DB 기반으로 전환
 2. 관리자 액션 audit log 추가
 3. 고객 리포트 조회를 order id가 아닌 access token URL로 전환
-4. schema별 DB role 분리
-5. 운영 메트릭/헬스체크 추가
+4. 서비스별 DB table ownership 분리
+5. public/admin/worker 간 직접 DB 공유 제거
 6. 큐 트래픽이 커질 때 RabbitMQ 또는 Kafka PoC

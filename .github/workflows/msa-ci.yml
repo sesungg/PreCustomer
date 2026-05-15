@@ -28,7 +28,6 @@ jobs:
           target="$(mktemp -d)"
           ./tools/export-multi-repo-msa.sh "$target"
           (cd "$target/precustomer-contracts" && ./gradlew test)
-          (cd "$target/precustomer-core" && ./gradlew test)
           (cd "$target/precustomer-api-gateway" && ./gradlew bootJar)
           (cd "$target/precustomer-public-web" && ./gradlew bootJar)
           (cd "$target/precustomer-admin-web" && ./gradlew bootJar)

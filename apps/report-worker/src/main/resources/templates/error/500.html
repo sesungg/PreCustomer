@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>오류가 발생했습니다</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<main class="page narrow">
+    <div class="completion">
+        <p class="eyebrow">500</p>
+        <h1>오류가 발생했습니다.</h1>
+        <p th:text="${message ?: '잠시 후 다시 시도해 주세요.'}"></p>
+        <pre style="color:#dc2626;background:#fee2e2;padding:12px;border-radius:8px;font-size:0.8rem;white-space:pre-wrap;word-break:break-all;margin-top:16px" th:if="${detail != null}" th:text="${detail}"></pre>
+        <a class="button secondary" href="/">처음으로</a>
+    </div>
+</main>
+</body>
+</html>

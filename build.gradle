@@ -43,7 +43,7 @@ def registerRootBootRun(String taskName, String modulePath, String mainClassName
 registerRootBootRun(
         'bootRun',
         ':apps:combined-web',
-        'com.example.personareport.combined.CombinedWebApplication',
+        'com.example.personareport.CombinedWebApplication',
         'local,web',
         'Run the combined public/admin web process.'
 )
@@ -51,7 +51,7 @@ registerRootBootRun(
 registerRootBootRun(
         'bootRunWeb',
         ':apps:combined-web',
-        'com.example.personareport.combined.CombinedWebApplication',
+        'com.example.personareport.CombinedWebApplication',
         'local,web',
         'Run the combined public/admin web process without the report worker.'
 )
@@ -59,7 +59,7 @@ registerRootBootRun(
 registerRootBootRun(
         'bootRunPublicWeb',
         ':apps:public-web',
-        'com.example.personareport.publicweb.PublicWebApplication',
+        'com.example.personareport.PublicWebApplication',
         'local,public-web',
         'Run the public customer web process without admin routes or the report worker.'
 )
@@ -67,7 +67,7 @@ registerRootBootRun(
 registerRootBootRun(
         'bootRunAdminWeb',
         ':apps:admin-web',
-        'com.example.personareport.adminweb.AdminWebApplication',
+        'com.example.personareport.AdminWebApplication',
         'local,admin-web',
         'Run the admin web process without public routes or the report worker.'
 )
@@ -83,7 +83,7 @@ registerRootBootRun(
 registerRootBootRun(
         'bootRunWorker',
         ':apps:report-worker',
-        'com.example.personareport.worker.ReportWorkerApplication',
+        'com.example.personareport.ReportWorkerApplication',
         'local,worker',
         'Run the report job worker process without starting an HTTP server.'
 )

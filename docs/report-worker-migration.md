@@ -1,6 +1,6 @@
 # public/admin/worker 분리 운영 가이드
 
-1차 MSA 전환 단계에서는 같은 코드베이스와 같은 DB를 공유하되, Gradle app 모듈별 실행 JAR로 사용자 web, 관리자 web, 리포트 worker를 분리한다.
+현재 MSA 전환 단계에서는 같은 mono-repo와 같은 DB를 공유하되, Gradle app 모듈별 실행 JAR로 사용자 web, 관리자 web, 리포트 worker를 분리한다. 공통 core 모듈은 제거했고, 각 app이 자신의 코드와 리소스를 직접 보유한다.
 
 ## 구조
 

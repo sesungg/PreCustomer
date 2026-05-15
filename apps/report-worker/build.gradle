@@ -2,12 +2,10 @@ plugins {
     id 'org.springframework.boot'
 }
 
-dependencies {
-    implementation project(':modules:precustomer-core')
-}
+apply from: rootProject.file('gradle/precustomer-service-app.gradle')
 
 springBoot {
-    mainClass = 'com.example.personareport.worker.ReportWorkerApplication'
+    mainClass = 'com.example.personareport.ReportWorkerApplication'
 }
 
 bootJar {
