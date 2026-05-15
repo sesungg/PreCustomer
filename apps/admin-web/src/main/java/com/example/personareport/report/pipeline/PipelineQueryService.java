@@ -490,9 +490,9 @@ public class PipelineQueryService {
     public boolean hasReportShoppingAnalysis(Long orderId) {
         Integer count = jdbc.queryForObject("""
                 SELECT COUNT(*)
-                FROM shopping_search_group
-                WHERE report_id = ?
-                  AND candidate_count > 0
+                FROM shopping_search_group g
+                JOIN shopping_market_analysis_snapshot a ON a.search_group_id = g.id
+                WHERE g.report_id = ?
                 """, Integer.class, orderId);
         return count != null && count > 0;
     }

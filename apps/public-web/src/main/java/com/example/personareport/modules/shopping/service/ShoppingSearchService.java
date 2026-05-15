@@ -56,6 +56,7 @@ public class ShoppingSearchService {
 
         // 3. sort별 API 호출 + product 저장 (Feign Client)
         int totalFetched = 0;
+        boolean stopNaverCalls = false;
         for (String q : queries) {
             for (String sort : SORTS) {
                 NaverSearchResult result = callNaverApi(q, sort, props.displaySize(), 1);
@@ -65,6 +66,13 @@ public class ShoppingSearchService {
                         "INSERT INTO shopping_search_snapshot (search_group_id, query, sort, display, start, total_count, raw_response_json, success, error_message, collected_at) VALUES (?,?,?,?,?,?,?::jsonb,?,?,NOW()) RETURNING id",
                         Long.class, groupId, q, sort, props.displaySize(), 1, result.totalCount,
                         result.rawJson, result.success, result.errorMessage);
+
+                if (!result.success && isNaverAuthFailure(result.errorMessage)) {
+                    log.warn("네이버 쇼핑 인증 실패로 남은 쇼핑 API 호출을 중단합니다. searchGroupId={}, reason={}",
+                            groupId, compactError(result.errorMessage));
+                    stopNaverCalls = true;
+                    break;
+                }
 
                 if (result.success) {
                     for (int rank = 0; rank < result.items.size(); rank++) {
@@ -92,6 +100,9 @@ public class ShoppingSearchService {
                                 rank + 1, sort, qualityScore, confidence);
                     }
                 }
+            }
+            if (stopNaverCalls) {
+                break;
             }
         }
 
@@ -178,6 +189,10 @@ public class ShoppingSearchService {
 
     private NaverSearchResult callNaverApi(String query, String sort, int display, int start) {
         try {
+            if (isBlank(props.clientId()) || isBlank(props.clientSecret())) {
+                return new NaverSearchResult(false, 0, List.of(), null,
+                        "NAVER_AUTH_MISSING: NAVER_SHOPPING_CLIENT_ID/NAVER_SHOPPING_CLIENT_SECRET is required");
+            }
             String raw = naverFeign.search(props.clientId(), props.clientSecret(), query, sort, display, start);
             var root = objectMapper.readTree(raw);
             int total = root.path("total").asInt();
@@ -194,9 +209,40 @@ public class ShoppingSearchService {
             }
             return new NaverSearchResult(true, total, items, raw, null);
         } catch (Exception e) {
-            log.warn("Naver API error: {}", e.getMessage());
-            return new NaverSearchResult(false, 0, List.of(), null, e.getMessage());
+            String message = e.getMessage();
+            if (isNaverAuthFailure(message)) {
+                log.warn("Naver API authentication failed: {}", compactError(message));
+                return new NaverSearchResult(false, 0, List.of(), null, "NAVER_AUTH_FAILED: " + compactError(message));
+            }
+            log.warn("Naver API error: {}", compactError(message));
+            return new NaverSearchResult(false, 0, List.of(), null, compactError(message));
         }
+    }
+
+    private boolean isNaverAuthFailure(String message) {
+        if (message == null) {
+            return false;
+        }
+        String lower = message.toLowerCase(Locale.ROOT);
+        return lower.contains("naver_auth_missing")
+                || lower.contains("naver_auth_failed")
+                || lower.contains("401 unauthorized")
+                || lower.contains("authentication failed")
+                || lower.contains("not exist client id")
+                || lower.contains("\"errorcode\":\"024\"")
+                || lower.contains("invalid client");
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+
+    private String compactError(String message) {
+        if (message == null || message.isBlank()) {
+            return "unknown";
+        }
+        String compact = message.replaceAll("\\s+", " ").trim();
+        return compact.length() > 500 ? compact.substring(0, 500) : compact;
     }
 
     private int parseInt(com.fasterxml.jackson.databind.JsonNode node, String field) {
