@@ -26,6 +26,16 @@ bootRunGateway       # api-gateway 실행
 bootRunWorker        # report-worker 실행
 ```
 
+기본 실행 포트:
+
+| 앱 | 포트 |
+| --- | --- |
+| Combined Web | `8080` |
+| Public Web | `8080` |
+| Admin Web | `8081` |
+| API Gateway | `8088` |
+| Report Worker | HTTP 서버 없음 |
+
 ## Application Run Configuration
 
 직접 Application Run Configuration을 만들 때는 아래처럼 설정합니다.

@@ -34,7 +34,7 @@ management:
 
 app:
   web:
-    public-enabled: ${APP_WEB_PUBLIC_ENABLED:true}
+    public-enabled: ${APP_WEB_PUBLIC_ENABLED:false}
     admin-enabled: ${APP_WEB_ADMIN_ENABLED:true}
   upload:
     dir: ./uploads
@@ -112,11 +112,14 @@ spring:
   thymeleaf:
     cache: false
 app:
+  web:
+    public-enabled: false
+    admin-enabled: true
   pipeline:
-    worker-enabled: ${REPORT_PIPELINE_WORKER_ENABLED:true}
+    worker-enabled: ${REPORT_PIPELINE_WORKER_ENABLED:false}
 
 server:
-  port: 8080
+  port: ${ADMIN_PORT:${PORT:8081}}
 
 ---
 spring:
@@ -161,7 +164,7 @@ spring:
     open-in-view: false
 
 server:
-  port: ${PORT:8080}
+  port: ${ADMIN_PORT:${PORT:8081}}
 
 ---
 spring:

@@ -51,6 +51,15 @@ ADMIN_USERNAME=admin ADMIN_PASSWORD=local-secret ./gradlew bootRunGateway
 ./gradlew bootRunWorker
 ```
 
+기본 포트는 아래처럼 분리된다.
+
+| 프로세스 | 기본 포트 |
+| --- | --- |
+| public-web | `8080` |
+| admin-web | `8081` |
+| api-gateway | `8088` |
+| report-worker | HTTP 서버 없음 |
+
 ## 운영 실행
 
 app 모듈별 JAR를 빌드한 뒤 각 프로세스로 실행한다.

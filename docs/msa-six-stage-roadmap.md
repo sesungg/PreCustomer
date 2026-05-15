@@ -104,6 +104,8 @@ docker compose -f compose.msa.yml up --build
 
 gateway는 `http://localhost:8088`에서 확인한다.
 
+기본 포트는 public-web `8080`, admin-web `8081`, gateway `8088`이며, report-worker는 HTTP 서버를 띄우지 않는다.
+
 직접 실행은 기존 Gradle task를 사용한다.
 
 ```bash

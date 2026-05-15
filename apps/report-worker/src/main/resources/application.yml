@@ -1,6 +1,8 @@
 spring:
   application:
     name: precustomer
+  main:
+    web-application-type: none
   cloud:
     openfeign:
       client:
@@ -34,8 +36,8 @@ management:
 
 app:
   web:
-    public-enabled: ${APP_WEB_PUBLIC_ENABLED:true}
-    admin-enabled: ${APP_WEB_ADMIN_ENABLED:true}
+    public-enabled: ${APP_WEB_PUBLIC_ENABLED:false}
+    admin-enabled: ${APP_WEB_ADMIN_ENABLED:false}
   upload:
     dir: ./uploads
     allowed-types: image/webp,image/png,image/jpeg
@@ -56,7 +58,7 @@ app:
     persona-candidate-limit: ${REPORT_PERSONA_CANDIDATE_LIMIT:50000}
     reaction-concurrency: ${REPORT_REACTION_CONCURRENCY:3}
     stale-timeout-minutes: ${REPORT_PIPELINE_STALE_TIMEOUT_MINUTES:60}
-    worker-enabled: ${REPORT_PIPELINE_WORKER_ENABLED:false}
+    worker-enabled: ${REPORT_PIPELINE_WORKER_ENABLED:true}
     worker-poll-ms: ${REPORT_PIPELINE_WORKER_POLL_MS:3000}
     worker-initial-delay-ms: ${REPORT_PIPELINE_WORKER_INITIAL_DELAY_MS:0}
     worker-lease-minutes: ${REPORT_PIPELINE_WORKER_LEASE_MINUTES:240}
@@ -97,6 +99,8 @@ spring:
   config:
     activate:
       on-profile: local
+  main:
+    web-application-type: none
   datasource:
     url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/precustomer}
     username: ${DATABASE_USERNAME:postgres}
@@ -112,11 +116,11 @@ spring:
   thymeleaf:
     cache: false
 app:
+  web:
+    public-enabled: false
+    admin-enabled: false
   pipeline:
     worker-enabled: ${REPORT_PIPELINE_WORKER_ENABLED:true}
-
-server:
-  port: 8080
 
 ---
 spring:
@@ -150,6 +154,8 @@ spring:
   config:
     activate:
       on-profile: prod
+  main:
+    web-application-type: none
   datasource:
     url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/precustomer}
     username: ${DATABASE_USERNAME:precustomer}
@@ -159,9 +165,6 @@ spring:
     hibernate:
       ddl-auto: none
     open-in-view: false
-
-server:
-  port: ${PORT:8080}
 
 ---
 spring:
