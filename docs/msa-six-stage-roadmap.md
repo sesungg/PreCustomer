@@ -1,6 +1,6 @@
 # MSA 6단계 전환 로드맵
 
-이 프로젝트는 포트폴리오용 MSA를 보여주되, 운영 안정성을 해치지 않도록 단계적으로 분리한다.
+이 프로젝트는 운영 안정성을 해치지 않도록 단계적으로 MSA 구조로 분리한다.
 
 ## 1단계: 실행 프로세스 분리
 
@@ -68,14 +68,17 @@ RabbitMQ/Kafka는 아직 넣지 않는다. 대신 `ReportJobQueue` 포트를 기
 
 ## 6단계: Gateway/Auth Server 준비
 
-이번 단계에서 Nginx gateway 예시와 Docker Compose 실행 구성을 추가했다.
+이번 단계에서 Spring Cloud Gateway 실행 앱과 Docker Compose 실행 구성을 추가했다.
 
 - gateway `/` -> `public-web`
 - gateway `/admin/**` -> `admin-web`
 - gateway `/api/shopping/naver/**` -> `admin-web`
 - gateway `/uploads/**` -> `admin-web`
+- gateway `/auth/login` -> JWT 발급
+- gateway가 admin 요청마다 내부 `X-PreCustomer-Passport`를 발급
+- admin-web은 Passport를 검증해 `ROLE_ADMIN`으로 인증 처리
 
-별도 auth-service는 아직 만들지 않는다. 관리자 사용자/권한 도메인, refresh token, 서비스 간 인증이 필요해지는 시점에 분리한다. 지금은 admin-web 세션 인증으로 충분하고, 포트폴리오에서는 “왜 아직 auth-service를 만들지 않았는지”가 오히려 좋은 설명 포인트다.
+별도 auth-service는 아직 만들지 않는다. 관리자 사용자/권한 도메인, refresh token, 서비스 간 인증이 필요해지는 시점에 분리한다. 지금은 gateway가 얇은 인증 진입점 역할을 맡고, admin-web 세션 로그인은 직접 실행/개발용 fallback으로 유지한다.
 
 ## 로컬 실행
 
@@ -84,6 +87,8 @@ RabbitMQ/Kafka는 아직 넣지 않는다. 대신 `ReportJobQueue` 포트를 기
 
 ADMIN_USERNAME=admin \
 ADMIN_PASSWORD=local-secret \
+GATEWAY_JWT_SECRET=dev-jwt-secret-for-compose-32bytes-minimum \
+GATEWAY_PASSPORT_SECRET=dev-passport-secret-for-compose-32bytes \
 docker compose -f compose.msa.yml up --build
 ```
 
@@ -94,6 +99,7 @@ gateway는 `http://localhost:8088`에서 확인한다.
 ```bash
 ./gradlew bootRunPublicWeb
 ./gradlew bootRunAdminWeb
+./gradlew bootRunGateway
 ./gradlew bootRunWorker
 ```
 

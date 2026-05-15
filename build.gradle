@@ -73,6 +73,14 @@ registerRootBootRun(
 )
 
 registerRootBootRun(
+        'bootRunGateway',
+        ':apps:api-gateway',
+        'com.example.personareport.gateway.ApiGatewayApplication',
+        'local,gateway',
+        'Run the Spring Cloud API gateway with JWT and passport authentication.'
+)
+
+registerRootBootRun(
         'bootRunWorker',
         ':apps:report-worker',
         'com.example.personareport.worker.ReportWorkerApplication',
@@ -89,7 +97,8 @@ tasks.register('bootRunAll') {
 tasks.register('bootJarAll') {
     group = 'build'
     description = 'Build all executable application jars.'
-    dependsOn ':apps:combined-web:bootJar',
+    dependsOn ':apps:api-gateway:bootJar',
+            ':apps:combined-web:bootJar',
             ':apps:public-web:bootJar',
             ':apps:admin-web:bootJar',
             ':apps:report-worker:bootJar'

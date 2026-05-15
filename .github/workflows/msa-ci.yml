@@ -1,0 +1,35 @@
+name: msa-ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  multi-module:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - run: ./gradlew clean test bootJarAll
+
+  export-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - run: bash -n tools/export-multi-repo-msa.sh
+      - run: |
+          target="$(mktemp -d)"
+          ./tools/export-multi-repo-msa.sh "$target"
+          (cd "$target/precustomer-contracts" && ./gradlew test)
+          (cd "$target/precustomer-core" && ./gradlew test)
+          (cd "$target/precustomer-api-gateway" && ./gradlew bootJar)
+          (cd "$target/precustomer-public-web" && ./gradlew bootJar)
+          (cd "$target/precustomer-admin-web" && ./gradlew bootJar)
+          (cd "$target/precustomer-report-worker" && ./gradlew bootJar)

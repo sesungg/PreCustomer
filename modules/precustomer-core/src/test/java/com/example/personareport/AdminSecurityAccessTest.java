@@ -7,8 +7,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.example.personareport.contracts.auth.PassportCodec;
 import com.example.personareport.modules.shopping.client.NaverShoppingFeignClient;
 import com.example.personareport.report.pipeline.DeepSeekFeignClient;
+import java.time.Duration;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -25,6 +28,8 @@ import org.springframework.test.web.servlet.MockMvc;
 })
 @AutoConfigureMockMvc
 class AdminSecurityAccessTest {
+
+    private static final String PASSPORT_SECRET = "local-passport-secret-change-me-32bytes!";
 
     @Autowired
     private MockMvc mockMvc;
@@ -50,6 +55,20 @@ class AdminSecurityAccessTest {
     }
 
     @Test
+    void adminPage_allowsGatewayPassport() throws Exception {
+        String passport = PassportCodec.issue(
+                PASSPORT_SECRET,
+                "gateway-admin@example.com",
+                List.of("ROLE_ADMIN"),
+                Duration.ofMinutes(5)
+        );
+
+        mockMvc.perform(get("/admin/orders")
+                        .header("X-PreCustomer-Passport", passport))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void publicOrderForm_allowsAnonymous() throws Exception {
         mockMvc.perform(get("/orders/new"))
                 .andExpect(status().isOk());
@@ -58,6 +77,12 @@ class AdminSecurityAccessTest {
     @Test
     void loginPage_allowsAnonymous() throws Exception {
         mockMvc.perform(get("/login"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void actuatorHealth_allowsAnonymous() throws Exception {
+        mockMvc.perform(get("/actuator/health"))
                 .andExpect(status().isOk());
     }
 

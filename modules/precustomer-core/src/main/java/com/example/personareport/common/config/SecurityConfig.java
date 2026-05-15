@@ -16,19 +16,24 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Slf4j
 @Configuration
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
-@EnableConfigurationProperties(AdminSecurityProperties.class)
+@EnableConfigurationProperties({AdminSecurityProperties.class, GatewayPassportProperties.class})
 public class SecurityConfig {
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain securityFilterChain(
+            HttpSecurity http,
+            GatewayPassportAuthenticationFilter gatewayPassportAuthenticationFilter
+    ) throws Exception {
         http
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PathRequest.toStaticResources().atCommonLocations()).permitAll()
                         .requestMatchers("/", "/orders/**", "/error", "/favicon.ico").permitAll()
+                        .requestMatchers("/actuator/health/**").permitAll()
                         .requestMatchers("/h2-console/**").permitAll()
                         .requestMatchers("/admin/**", "/api/shopping/naver/**", "/uploads/**").hasRole("ADMIN")
                         .anyRequest().denyAll()
@@ -43,7 +48,8 @@ public class SecurityConfig {
                         .permitAll()
                 )
                 .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
-                .csrf(csrf -> csrf.ignoringRequestMatchers("/h2-console/**"));
+                .csrf(csrf -> csrf.ignoringRequestMatchers("/h2-console/**"))
+                .addFilterBefore(gatewayPassportAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
