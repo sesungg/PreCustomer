@@ -9,7 +9,14 @@
 <body>
 <header class="site-header">
     <a class="brand" href="/">CustomerPreview</a>
-    <a class="header-link" href="/">처음으로</a>
+    <nav class="header-nav">
+        <a class="header-link" href="/">처음으로</a>
+        <a class="header-link" th:if="${loggedInUser == null}" href="/login">로그인</a>
+        <form th:if="${loggedInUser != null}" th:action="@{/logout}" method="post" class="inline-form">
+            <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+            <button class="link-button" type="submit">로그아웃</button>
+        </form>
+    </nav>
 </header>
 
 <main class="page narrow">
@@ -24,6 +31,54 @@
         </div>
         <p>입금 확인 후 순차적으로 AI 기반 가상고객 시뮬레이션 리포트를 생성합니다.</p>
         <p>개인정보, 고객 DB, 매출자료, 계약서, 내부 기획자료, 병원·금융·법률 등 민감정보를 입력한 경우 별도로 연락해 주세요.</p>
+
+        <div class="notice success" th:if="${joined}">회원가입이 완료되었습니다. 이 계정으로 리포트 완료 알림을 받을 수 있습니다.</div>
+        <div class="notice success" th:if="${deliverySaved}">리포트 수신 이메일을 저장했습니다.</div>
+
+        <section class="followup-panel" th:if="${loggedInUser == null}">
+            <div>
+                <h2>리포트 받는 방법</h2>
+                <p>계정을 만들면 이후 리포트 확인과 재신청을 같은 이메일로 이어갈 수 있습니다.</p>
+            </div>
+            <form class="form compact-form" th:action="@{/signup}" th:object="${signupRequest}" method="post">
+                <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                <input type="hidden" th:field="*{returnOrderId}">
+                <div class="field">
+                    <label for="displayName">사용자 이름 또는 업체명</label>
+                    <input id="displayName" type="text" th:field="*{displayName}" autocomplete="organization">
+                </div>
+                <div class="field">
+                    <label for="signupEmail">이메일</label>
+                    <input id="signupEmail" type="email" th:field="*{email}" autocomplete="email">
+                </div>
+                <div class="field">
+                    <label for="signupPassword">비밀번호</label>
+                    <input id="signupPassword" type="password" th:field="*{password}" autocomplete="new-password">
+                </div>
+                <div class="field">
+                    <label for="signupPasswordConfirm">비밀번호 확인</label>
+                    <input id="signupPasswordConfirm" type="password" th:field="*{passwordConfirm}" autocomplete="new-password">
+                </div>
+                <button class="button primary full" type="submit">회원가입하고 리포트 받기</button>
+            </form>
+            <div class="divider-text">또는</div>
+            <form class="form compact-form" th:action="@{/orders/{id}/delivery-email(id=${order.id})}" method="post">
+                <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                <div class="field">
+                    <label for="deliveryEmail">완성 리포트를 받을 이메일</label>
+                    <input id="deliveryEmail" type="email" name="email" th:value="${deliveryEmail}" autocomplete="email">
+                    <p class="field-error" th:if="${deliveryError != null}" th:text="${deliveryError}"></p>
+                </div>
+                <button class="button secondary full" type="submit">이메일만 남기기</button>
+            </form>
+        </section>
+
+        <section class="followup-panel" th:if="${loggedInUser != null}">
+            <h2>리포트 수신 계정</h2>
+            <p><strong th:text="${loggedInUser.displayName}"></strong> 계정의 이메일로 리포트 완료 알림을 받을 수 있습니다.</p>
+            <p class="muted-text" th:text="${loggedInUser.email}"></p>
+        </section>
+
         <a class="button secondary" href="/">서비스 소개로 돌아가기</a>
     </div>
 </main>

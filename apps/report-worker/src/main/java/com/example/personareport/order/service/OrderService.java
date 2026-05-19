@@ -7,6 +7,7 @@ import com.example.personareport.order.dto.OrderRequest;
 import com.example.personareport.order.repository.ReactionReportOrderRepository;
 import com.example.personareport.report.service.ImageStorageService;
 import com.example.personareport.report.service.ImageStorageService.ImageUploadException;
+import com.example.personareport.user.domain.UserAccount;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +30,11 @@ public class OrderService {
      */
     @Transactional
     public ReactionReportOrder createOrder(OrderRequest request, List<MultipartFile> images) {
+        return createOrder(request, images, null);
+    }
+
+    @Transactional
+    public ReactionReportOrder createOrder(OrderRequest request, List<MultipartFile> images, UserAccount account) {
         ReactionReportOrder order = ReactionReportOrder.create(
                 request.customerEmail(),
                 request.projectName(),
@@ -42,6 +48,9 @@ public class OrderService {
                 request.reportPerspective(),
                 request.privacyAgreement()
         );
+        if (account != null) {
+            order.attachCustomerAccount(account.getId(), account.getEmail());
+        }
 
         order = orderRepository.save(order);
 
@@ -56,6 +65,13 @@ public class OrderService {
             }
         }
 
+        return order;
+    }
+
+    @Transactional
+    public ReactionReportOrder attachCustomerAccount(Long id, UserAccount account) {
+        ReactionReportOrder order = getOrder(id);
+        order.attachCustomerAccount(account.getId(), account.getEmail());
         return order;
     }
 

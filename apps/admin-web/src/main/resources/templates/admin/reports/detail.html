@@ -59,6 +59,20 @@
         .takeaway { background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:14px 18px; margin-top:16px; font-size:0.88rem; line-height:1.65; }
         .takeaway strong { color:var(--amber); font-size:0.75rem; letter-spacing:0.05em; display:block; margin-bottom:4px; }
 
+        /* ── 판단 근거 ── */
+        .evidence-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:14px; margin-bottom:16px; }
+        .evidence-card { border:1px solid var(--border); border-radius:8px; padding:14px 16px; background:#fff; }
+        .evidence-card h3 { margin:0 0 8px; font-size:0.86rem; color:var(--slate); }
+        .evidence-card p { margin:4px 0; font-size:0.8rem; line-height:1.55; color:#475569; }
+        .source-badge { display:inline-flex; align-items:center; padding:2px 8px; border-radius:4px; font-size:0.72rem; font-weight:700; }
+        .source-badge.ok { background:#d1fae5; color:#065f46; }
+        .source-badge.warn { background:#fef3c7; color:#92400e; }
+        .source-badge.bad { background:#fee2e2; color:#991b1b; }
+        .source-note { color:var(--gray); font-size:0.76rem; }
+        .evidence-table td small { color:var(--gray); display:block; margin-top:2px; line-height:1.35; }
+        .priority-list { margin:10px 0 0; padding-left:18px; color:#475569; font-size:0.82rem; line-height:1.7; }
+        .table-scroll { overflow-x:auto; }
+
         /* ── 고객군 테이블 ── */
         .summary-table { width:100%; border-collapse:collapse; font-size:0.85rem; }
         .summary-table th { background:var(--surface); padding:9px 12px; text-align:left; font-weight:600; color:var(--slate); border-bottom:2px solid var(--border); font-size:0.78rem; white-space:nowrap; }
@@ -205,6 +219,150 @@
             <div class="val" th:text="${clarityScore}" style="color:var(--green)">-</div>
             <div class="lbl">설명 이해도</div>
             <div class="bar-wrap"><div class="bar-fill" th:style="'width:' + ${clarityScore} + '%;background:var(--green)'"></div></div>
+        </div>
+    </div>
+
+    <!-- ④ 판단 근거 데이터 -->
+    <div class="section" th:if="${evidenceSummary != null}">
+        <h2><span class="sec-icon">🔎</span> 판단 근거 데이터</h2>
+        <div class="evidence-grid">
+            <div class="evidence-card">
+                <h3>상세페이지 URL 분석</h3>
+                <p>
+                    <span class="source-badge"
+                          th:classappend="${evidenceSummary.url.statusTone == 'ok'} ? 'ok' : (${evidenceSummary.url.statusTone == 'bad'} ? 'bad' : 'warn')"
+                          th:text="${evidenceSummary.url.statusLabel}">미확인</span>
+                </p>
+                <p th:if="${evidenceSummary.url.failureReason}" th:text="'실패/보완 사유: ' + ${evidenceSummary.url.failureReason}"></p>
+                <p th:text="'상품명: ' + ${evidenceSummary.url.productTitle}"></p>
+                <p class="source-note" th:text="${evidenceSummary.url.sourceNote}"></p>
+            </div>
+            <div class="evidence-card">
+                <h3>출처 우선순위</h3>
+                <ol class="priority-list">
+                    <li th:each="rule : ${evidenceSummary.sourcePriority}" th:text="${rule}"></li>
+                </ol>
+                <p class="source-note" th:text="${evidenceSummary.scoreRule}"></p>
+            </div>
+        </div>
+
+        <div class="takeaway" th:if="${evidenceWarnings != null && !evidenceWarnings.isEmpty()}">
+            <strong>근거 검증 경고</strong>
+            <div th:each="warning : ${evidenceWarnings}" th:text="${warning}"></div>
+        </div>
+
+        <div class="table-scroll">
+            <table class="summary-table evidence-table">
+                <thead>
+                    <tr><th>항목</th><th>값</th><th>출처</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>상품 가격</td>
+                        <td th:text="${evidenceSummary.product.displayPrice.value}">-</td>
+                        <td th:text="${evidenceSummary.product.displayPrice.source}">-</td>
+                    </tr>
+                    <tr>
+                        <td>상품 중량</td>
+                        <td th:text="${evidenceSummary.product.weight.value}">-</td>
+                        <td th:text="${evidenceSummary.product.weight.source}">-</td>
+                    </tr>
+                    <tr>
+                        <td>표시가 기준 단위 가격</td>
+                        <td th:text="${evidenceSummary.product.displayUnitPrice.value}">-</td>
+                        <td th:text="${evidenceSummary.product.displayUnitPrice.source}">-</td>
+                    </tr>
+                    <tr>
+                        <td>원산지</td>
+                        <td th:text="${evidenceSummary.product.origin.value}">-</td>
+                        <td th:text="${evidenceSummary.product.origin.source}">-</td>
+                    </tr>
+                    <tr>
+                        <td>보관 방식</td>
+                        <td th:text="${evidenceSummary.product.storage.value}">-</td>
+                        <td th:text="${evidenceSummary.product.storage.source}">-</td>
+                    </tr>
+                    <tr>
+                        <td>리뷰 수</td>
+                        <td th:text="${evidenceSummary.product.reviewCount.value}">-</td>
+                        <td th:text="${evidenceSummary.product.reviewCount.source}">-</td>
+                    </tr>
+                    <tr>
+                        <td>평점</td>
+                        <td th:text="${evidenceSummary.product.ratingScore.value}">-</td>
+                        <td th:text="${evidenceSummary.product.ratingScore.source}">-</td>
+                    </tr>
+                    <tr>
+                        <td>배송비 유형</td>
+                        <td th:text="${evidenceSummary.shipping.typeText}">-</td>
+                        <td th:text="${evidenceSummary.shipping.source}">-</td>
+                    </tr>
+                    <tr>
+                        <td>배송비 / 조건부 무료배송 기준</td>
+                        <td>
+                            <span th:text="${evidenceSummary.shipping.amountText}">-</span>
+                            <small th:text="'기준: ' + ${evidenceSummary.shipping.thresholdText}"></small>
+                        </td>
+                        <td th:text="${evidenceSummary.shipping.calculationSource}">-</td>
+                    </tr>
+                    <tr>
+                        <td>배송비 포함 실구매가</td>
+                        <td>
+                            <span th:text="${evidenceSummary.shipping.actualPriceText}">-</span>
+                            <small th:text="${evidenceSummary.shipping.actualUnitPriceText}"></small>
+                        </td>
+                        <td th:text="${evidenceSummary.shipping.note}">-</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="evidence-grid" style="margin-top:16px">
+            <div class="evidence-card">
+                <h3>네이버 쇼핑 비교</h3>
+                <p th:text="'사용 여부: ' + ${evidenceSummary.shopping.usedText}"></p>
+                <p th:text="'비교 후보 수: ' + ${evidenceSummary.shopping.candidateCount} + '개 / 화면 표시 ' + ${evidenceSummary.shopping.comparisonProductCount} + '개'"></p>
+                <p th:text="'현재 상품 기준가: ' + ${evidenceSummary.shopping.basePriceText}"></p>
+                <p th:text="'가격 위치: ' + ${evidenceSummary.shopping.priceLevelText} + ' · ' + ${evidenceSummary.shopping.pricePositionText}"></p>
+                <p th:text="'Q1/중앙값/Q3: ' + ${evidenceSummary.shopping.q1PriceText} + ' / ' + ${evidenceSummary.shopping.medianPriceText} + ' / ' + ${evidenceSummary.shopping.q3PriceText}"></p>
+                <p class="source-note" th:text="${evidenceSummary.shopping.shippingIncludedText}"></p>
+                <p class="source-note" th:text="${evidenceSummary.shopping.comparisonConditionText}"></p>
+            </div>
+            <div class="evidence-card">
+                <h3>이미지 분석 출처</h3>
+                <p th:text="'분석 이미지 수: ' + ${evidenceSummary.image.count}"></p>
+                <p th:text="'이미지에서 확인한 원산지: ' + ${evidenceSummary.image.originText}"></p>
+                <p th:text="'이미지에서 확인한 중량: ' + ${evidenceSummary.image.weightText}"></p>
+                <p th:text="'이미지에서 확인한 보관 방식: ' + ${evidenceSummary.image.storageText}"></p>
+                <p class="source-note" th:text="${evidenceSummary.image.note}"></p>
+                <p class="source-note" th:text="'네이버 한계: ' + ${evidenceSummary.shopping.limitations}"></p>
+            </div>
+        </div>
+
+        <div class="table-scroll" th:if="${shoppingProducts != null && !shoppingProducts.isEmpty()}">
+            <table class="summary-table evidence-table">
+                <thead>
+                    <tr>
+                        <th>비교 상품</th><th>판매처</th><th>카테고리</th><th>원산지</th><th>보관</th>
+                        <th>중량</th><th>상품가</th><th>배송비</th><th>실구매가</th><th>100g당</th><th>후보 점수</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="p : ${shoppingProducts}">
+                        <td style="min-width:260px" th:text="${p.title}"></td>
+                        <td th:text="${p.mallName}"></td>
+                        <td th:text="${p.category}"></td>
+                        <td th:text="${p.origin}"></td>
+                        <td th:text="${p.storage}"></td>
+                        <td th:text="${p.weight}"></td>
+                        <td th:text="${p.priceText}"></td>
+                        <td th:text="${p.shippingText}"></td>
+                        <td th:text="${p.actualPriceText}"></td>
+                        <td th:text="${p.unitPriceText}"></td>
+                        <td th:text="${p.score}"></td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
     </div>
 

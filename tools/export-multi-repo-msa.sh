@@ -338,6 +338,10 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'org.springframework.session:spring-session-data-redis'
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
+    implementation 'org.springframework.kafka:spring-kafka'
     implementation 'org.springframework.cloud:spring-cloud-starter-openfeign:4.1.3'
     implementation 'com.querydsl:querydsl-jpa:5.1.0:jakarta'
 
@@ -467,6 +471,39 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7.4-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  kafka:
+    image: apache/kafka:3.7.1
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,PLAINTEXT_INTERNAL://:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+
   public-web:
     build:
       context: ../precustomer-public-web
@@ -478,8 +515,17 @@ services:
       DATABASE_USERNAME: ${PUBLIC_DB_USERNAME:-precustomer_public_web}
       DATABASE_PASSWORD: ${PUBLIC_DB_PASSWORD:-public-local}
       PUBLIC_PORT: 8080
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      APP_EVENTS_KAFKA_ENABLED: ${APP_EVENTS_KAFKA_ENABLED:-true}
+      REPORT_DELIVERY_BASE_URL: ${REPORT_DELIVERY_BASE_URL:-http://localhost:8088}
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health/readiness >/dev/null"]
@@ -498,11 +544,16 @@ services:
       DATABASE_USERNAME: ${ADMIN_DB_USERNAME:-precustomer_admin_web}
       DATABASE_PASSWORD: ${ADMIN_DB_PASSWORD:-admin-local}
       ADMIN_PORT: 8081
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-me-before-prod}
       GATEWAY_PASSPORT_SECRET: ${GATEWAY_PASSPORT_SECRET:-local-passport-secret-change-me-32bytes!}
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8081/actuator/health/readiness >/dev/null"]
@@ -524,8 +575,16 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       NAVER_SHOPPING_CLIENT_ID: ${NAVER_SHOPPING_CLIENT_ID:-}
       NAVER_SHOPPING_CLIENT_SECRET: ${NAVER_SHOPPING_CLIENT_SECRET:-}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      APP_EVENTS_KAFKA_ENABLED: ${APP_EVENTS_KAFKA_ENABLED:-true}
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "kill -0 1"]

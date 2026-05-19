@@ -3,6 +3,7 @@ package com.example.personareport.report.service;
 import com.example.personareport.modules.shopping.service.ShoppingSearchService;
 import com.example.personareport.order.service.OrderService;
 import com.example.personareport.report.domain.PipelineProgress;
+import com.example.personareport.report.delivery.service.ReportDeliveryService;
 import com.example.personareport.report.job.ReportJobService;
 import com.example.personareport.report.pipeline.PipelineQueryService;
 import com.example.personareport.report.pipeline.PipelineJavaService;
@@ -38,6 +39,7 @@ public class ReportPipelineService {
     private final ReportJobService jobService;
     private final OrderService orderService;
     private final ShoppingSearchService shoppingService;
+    private final ReportDeliveryService reportDeliveryService;
 
     @Value("${app.pipeline.scripts-dir:./scripts/pipeline}")
     private String scriptsDirPath;
@@ -152,9 +154,17 @@ public class ReportPipelineService {
             List<PipelineStep> steps = new ArrayList<>();
             steps.add(new PipelineStep(
                     "crawl",
-                    "URL 페이지 크롤링 중",
-                    () -> queryService.hasPageSnapshot(orderId),
-                    () -> runPython("crawl_page_snapshot.py", "--order-id", orderId.toString())
+                    hasImages ? "상세페이지 캡처 분석 준비 중" : "URL 페이지 크롤링 중",
+                    () -> hasImages
+                            ? queryService.hasScreenshotPrimarySnapshot(orderId)
+                            : queryService.hasPageSnapshot(orderId),
+                    () -> {
+                        if (hasImages) {
+                            saveService.upsertScreenshotPrimarySnapshot(orderId, imagePaths);
+                        } else {
+                            runPython("crawl_page_snapshot.py", "--order-id", orderId.toString());
+                        }
+                    }
             ));
             steps.add(new PipelineStep(
                     "shopping",
@@ -222,6 +232,7 @@ public class ReportPipelineService {
             progress.complete();
             progressService.save(progress);
             orderService.markCompleted(orderId);
+            reportDeliveryService.deliverCompletedReport(orderId);
             log.info("파이프라인 전체 완료 orderId={}, responseVersion={}, reportVersion={}, selectedCount={}",
                     orderId, responseVersion, reportVersion, selectedCount);
             return PipelineProgress.STATUS_COMPLETED;

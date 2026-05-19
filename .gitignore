@@ -9,6 +9,7 @@ uploads/*
 !uploads/.gitkeep
 .omc/
 .omx/
+.lazyweb/
 data/personas.full.jsonl
 data/personas.bulk-test.jsonl
 .DS_Store

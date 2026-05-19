@@ -9,7 +9,7 @@ spring:
         - id: public-web
           uri: ${PUBLIC_WEB_URI:http://localhost:8080}
           predicates:
-            - Path=/,/orders,/orders/**,/css/**,/js/**,/img/**,/webjars/**,/favicon.ico,/error
+            - Path=/,/orders,/orders/**,/login,/signup,/logout,/css/**,/js/**,/img/**,/webjars/**,/favicon.ico,/error
         - id: admin-web
           uri: ${ADMIN_WEB_URI:http://localhost:8081}
           predicates:

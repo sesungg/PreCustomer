@@ -15,6 +15,23 @@ spring:
       enabled: true
       max-file-size: 10MB
       max-request-size: 50MB
+  session:
+    store-type: ${SESSION_STORE_TYPE:redis}
+    timeout: ${SESSION_TIMEOUT:2h}
+    redis:
+      namespace: ${SESSION_REDIS_NAMESPACE:precustomer:session}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
 
 management:
   endpoints:
@@ -82,6 +99,16 @@ app:
       enabled: ${GATEWAY_PASSPORT_ENABLED:true}
       secret: ${GATEWAY_PASSPORT_SECRET:local-passport-secret-change-me-32bytes!}
       header-name: ${GATEWAY_PASSPORT_HEADER:X-PreCustomer-Passport}
+  delivery:
+    mail:
+      enabled: ${REPORT_DELIVERY_MAIL_ENABLED:false}
+      from: ${REPORT_DELIVERY_MAIL_FROM:no-reply@localhost}
+      base-url: ${REPORT_DELIVERY_BASE_URL:http://localhost:8080}
+  events:
+    kafka:
+      enabled: ${APP_EVENTS_KAFKA_ENABLED:false}
+      topics:
+        report-job-events: ${REPORT_JOB_EVENTS_TOPIC:report-job-events}
 
 naver:
   shopping:
@@ -132,6 +159,8 @@ spring:
     console:
       enabled: true
       path: /h2-console
+  session:
+    store-type: none
   jpa:
     hibernate:
       ddl-auto: update

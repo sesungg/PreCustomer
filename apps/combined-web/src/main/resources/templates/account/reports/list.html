@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>내 리포트</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<header class="site-header">
+    <a class="brand" href="/">CustomerPreview</a>
+    <nav class="header-nav">
+        <a class="header-link" href="/orders/new">리포트 신청하기</a>
+        <a class="header-link active" href="/account/reports">내 리포트</a>
+        <form th:action="@{/logout}" method="post" class="inline-form">
+            <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+            <button class="link-button" type="submit">로그아웃</button>
+        </form>
+    </nav>
+</header>
+
+<main class="page wide">
+    <section class="account-hero">
+        <div>
+            <p class="eyebrow">내 리포트</p>
+            <h1 th:text="${loggedInUser.displayName} + '님의 리포트'">내 리포트</h1>
+            <p class="sublead">신청한 리포트와 완성된 최종 리포트를 한 곳에서 확인합니다.</p>
+        </div>
+        <div class="account-stats">
+            <div>
+                <strong th:text="${#lists.size(reports)}">0</strong>
+                <span>전체 신청</span>
+            </div>
+            <div>
+                <strong th:text="${completedCount}">0</strong>
+                <span>완성 리포트</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="empty-state" th:if="${#lists.isEmpty(reports)}">
+        <h2>아직 신청한 리포트가 없습니다</h2>
+        <p>상품 상세페이지 이미지나 소개 정보를 올리면 리포트를 생성할 수 있습니다.</p>
+        <a class="button primary" href="/orders/new">리포트 신청하기</a>
+    </section>
+
+    <section class="account-report-list" th:if="${!#lists.isEmpty(reports)}">
+        <article class="account-report-list-item" th:each="item : ${reports}">
+            <div class="account-report-list-main">
+                <div class="row-title">
+                    <div>
+                        <p class="eyebrow" th:text="${item.targetTypeLabel}">상세페이지</p>
+                        <h2 th:text="${item.projectName}">프로젝트명</h2>
+                    </div>
+                    <span class="status" th:text="${item.statusLabel}">신청 완료</span>
+                </div>
+                <p class="muted-text" th:if="${item.executiveSummary}" th:text="${item.executiveSummary}">요약</p>
+                <p class="muted-text" th:unless="${item.executiveSummary}">
+                    최종 리포트가 완성되면 이곳에서 바로 확인할 수 있습니다.
+                </p>
+                <dl class="account-report-meta">
+                    <div>
+                        <dt>신청일</dt>
+                        <dd th:text="${item.orderedAt}">-</dd>
+                    </div>
+                    <div>
+                        <dt>리포트 상태</dt>
+                        <dd th:text="${item.reportReady} ? '완성' : '대기 중'">대기 중</dd>
+                    </div>
+                    <div th:if="${item.reportReady}">
+                        <dt>구매 의향</dt>
+                        <dd th:text="${item.purchaseIntentScore}">0</dd>
+                    </div>
+                    <div th:if="${item.reportReady}">
+                        <dt>신뢰도</dt>
+                        <dd th:text="${item.trustScore}">0</dd>
+                    </div>
+                </dl>
+            </div>
+            <div class="account-report-list-actions">
+                <a class="button primary" th:if="${item.reportReady}" th:href="@{/account/reports/{id}(id=${item.orderId})}">
+                    최종 리포트 보기
+                </a>
+                <a class="button secondary" th:unless="${item.reportReady}" th:href="@{/account/reports/{id}(id=${item.orderId})}">
+                    진행 상태 보기
+                </a>
+            </div>
+        </article>
+    </section>
+</main>
+</body>
+</html>

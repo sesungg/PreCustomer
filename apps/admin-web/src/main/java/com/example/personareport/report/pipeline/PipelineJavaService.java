@@ -275,11 +275,15 @@ public class PipelineJavaService {
         var imageAnalyses = queryService.findImageAnalyses(orderId);
         log.info("[generateReactions] imageAnalyses={}", imageAnalyses.size());
 
-        // 5) product payload 구성
-        String productPayloadJson = buildProductPayload(
-                order, snapshot, productProfile, imageAnalyses);
+        // 5) 쇼핑 비교 근거 조회
+        var shoppingEvidence = queryService.findLatestShoppingEvidence(orderId);
+        var shoppingProducts = queryService.findShoppingComparisonProducts(orderId, 12);
 
-        // 6) selected personas 조회
+        // 6) product payload 구성
+        String productPayloadJson = buildProductPayload(
+                order, snapshot, productProfile, imageAnalyses, shoppingEvidence, shoppingProducts);
+
+        // 7) selected personas 조회
         List<Map<String, Object>> selectedPersonas = queryService.findSelectedPersonasWithDetails(
                 orderId, p.getResponseVersion(), p.isSkipExisting(), null);
         if (selectedPersonas.isEmpty()) {
@@ -288,7 +292,7 @@ public class PipelineJavaService {
         }
         log.info("[generateReactions] selectedPersonas={}", selectedPersonas.size());
 
-        // 7) batch 처리
+        // 8) batch 처리
         Long productTargetProfileId = productProfile.getId();
         List<ReactionBatch> batches = new ArrayList<>();
 
@@ -527,10 +531,16 @@ public class PipelineJavaService {
         log.info("[generateFinalReport] orderId={}, responseCount={}, responseVersion={}",
                 orderId, responseCount, p.getResponseVersion());
 
-        // 5) 집계 데이터 구성 (Python build_aggregate() 동일)
-        Map<String, Object> aggregate = buildAggregate(order, snapshot, productProfile, responses);
+        // 5) 출처별 근거 조회
+        var imageAnalyses = queryService.findImageAnalyses(orderId);
+        var shoppingEvidence = queryService.findLatestShoppingEvidence(orderId);
+        var shoppingProducts = queryService.findShoppingComparisonProducts(orderId, 12);
 
-        // 6) DeepSeek 호출 (DB 트랜잭션 없음)
+        // 6) 집계 데이터 구성 (Python build_aggregate() 동일)
+        Map<String, Object> aggregate = buildAggregate(
+                order, snapshot, productProfile, responses, imageAnalyses, shoppingEvidence, shoppingProducts);
+
+        // 7) DeepSeek 호출 (DB 트랜잭션 없음)
         String aggregateJson;
         try {
             aggregateJson = objectMapper.writeValueAsString(aggregate);
@@ -544,10 +554,10 @@ public class PipelineJavaService {
             throw new RuntimeException("최종 리포트 생성 실패: DeepSeek 응답 파싱 오류");
         }
 
-        // 7) 정규화
+        // 8) 정규화
         Map<String, Object> report = normalizeReport(rawReport, aggregate);
 
-        // 8) 저장 (짧은 write 트랜잭션)
+        // 9) 저장 (짧은 write 트랜잭션)
         Long snapshotId = snapshot.isEmpty() ? null : longVal(snapshot.get("id"));
         Long productProfileId = productProfile.getId();
         saveService.upsertFinalReport(orderId, productProfileId, snapshotId,
@@ -1073,7 +1083,10 @@ public class PipelineJavaService {
     private Map<String, Object> buildAggregate(Map<String, Object> order,
                                                 Map<String, Object> snapshot,
                                                 Object productProfile,
-                                                List<Map<String, Object>> responses) {
+                                                List<Map<String, Object>> responses,
+                                                List<Map<String, Object>> imageAnalyses,
+                                                Map<String, Object> shoppingEvidence,
+                                                List<Map<String, Object>> shoppingProducts) {
         int total = responses.size();
 
         // score distributions
@@ -1151,16 +1164,20 @@ public class PipelineJavaService {
                 "persuasionMessages", topFlattenedItems(responses, "persuasion_messages", 25)
         ));
         aggregate.put("sampleResponses", sampleResponses(responses, 8));
+        aggregate.put("sourceEvidence", buildSourceEvidence(
+                snapshot, imageAnalyses, shoppingEvidence, shoppingProducts));
 
         if (!snapshot.isEmpty()) {
             aggregate.put("snapshot", Map.of(
                     "id", snapshot.get("id"),
                     "sourceSite", str(snapshot.get("source_site")),
+                    "snapshotStatus", str(snapshot.get("snapshot_status")),
                     "productTitle", str(snapshot.get("product_title")),
                     "priceText", str(snapshot.get("price_text")),
                     "extractedTextSummary", compact(str(snapshot.get("extracted_text_summary")), 5000),
                     "visibleText", compact(str(snapshot.get("visible_text")), 3000),
-                    "importantImages", parseJsonList(str(snapshot.get("important_images")))
+                    "importantImages", parseJsonList(str(snapshot.get("important_images"))),
+                    "rawMetaJson", parseJsonMap(str(snapshot.get("raw_meta_json")))
             ));
         }
 
@@ -1363,7 +1380,9 @@ public class PipelineJavaService {
     private String buildProductPayload(Map<String, Object> order,
                                         Map<String, Object> snapshot,
                                         Object productProfile,
-                                        List<Map<String, Object>> imageAnalyses) {
+                                        List<Map<String, Object>> imageAnalyses,
+                                        Map<String, Object> shoppingEvidence,
+                                        List<Map<String, Object>> shoppingProducts) {
         try {
             Map<String, Object> payload = new LinkedHashMap<>();
 
@@ -1379,17 +1398,25 @@ public class PipelineJavaService {
             orderMap.put("reportPerspective", str(order.get("report_perspective")));
             payload.put("order", orderMap);
 
-            payload.put("snapshot", !snapshot.isEmpty() ? Map.of(
-                    "id", snapshot.get("id"),
-                    "sourceSite", str(snapshot.get("source_site")),
-                    "productTitle", str(snapshot.get("product_title")),
-                    "priceText", str(snapshot.get("price_text")),
-                    "extractedTextSummary", compact(str(snapshot.get("extracted_text_summary")), 9000),
-                    "visibleText", compact(str(snapshot.get("visible_text")), 6000),
-                    "importantImages", parseJsonList(str(snapshot.get("important_images")))
-            ) : null);
+            if (!snapshot.isEmpty()) {
+                var snapshotMap = new LinkedHashMap<String, Object>();
+                snapshotMap.put("id", snapshot.get("id"));
+                snapshotMap.put("sourceSite", str(snapshot.get("source_site")));
+                snapshotMap.put("snapshotStatus", str(snapshot.get("snapshot_status")));
+                snapshotMap.put("productTitle", str(snapshot.get("product_title")));
+                snapshotMap.put("priceText", str(snapshot.get("price_text")));
+                snapshotMap.put("extractedTextSummary", compact(str(snapshot.get("extracted_text_summary")), 9000));
+                snapshotMap.put("visibleText", compact(str(snapshot.get("visible_text")), 6000));
+                snapshotMap.put("importantImages", parseJsonList(str(snapshot.get("important_images"))));
+                snapshotMap.put("rawMetaJson", parseJsonMap(str(snapshot.get("raw_meta_json"))));
+                payload.put("snapshot", snapshotMap);
+            } else {
+                payload.put("snapshot", null);
+            }
 
             payload.put("imageAnalyses", imageAnalyses != null ? imageAnalyses : List.of());
+            payload.put("sourceEvidence", buildSourceEvidence(
+                    snapshot, imageAnalyses, shoppingEvidence, shoppingProducts));
 
             // productTargetProfile
             payload.put("productTargetProfile", extractProfileData(productProfile));
@@ -1398,6 +1425,110 @@ public class PipelineJavaService {
         } catch (Exception e) {
             throw new RuntimeException("Product payload 구성 실패", e);
         }
+    }
+
+    private Map<String, Object> buildSourceEvidence(Map<String, Object> snapshot,
+                                                     List<Map<String, Object>> imageAnalyses,
+                                                     Map<String, Object> shoppingEvidence,
+                                                     List<Map<String, Object>> shoppingProducts) {
+        Map<String, Object> evidence = new LinkedHashMap<>();
+
+        Map<String, Object> rawMeta = !snapshot.isEmpty()
+                ? parseJsonMap(str(snapshot.get("raw_meta_json")))
+                : Map.of();
+        String snapshotStatus = str(snapshot.get("snapshot_status")).toUpperCase();
+        boolean captured = "CAPTURED".equals(snapshotStatus) || "SUCCESS".equals(snapshotStatus);
+        boolean screenshotPrimary = "SCREENSHOT_PRIMARY".equals(snapshotStatus);
+
+        Map<String, Object> url = new LinkedHashMap<>();
+        url.put("crawlStatus", snapshot.isEmpty() ? "MISSING" : snapshotStatus);
+        url.put("crawlSucceeded", captured);
+        url.put("screenshotPrimary", screenshotPrimary);
+        url.put("failureReason", str(rawMeta.get("crawlError")).isBlank()
+                ? str(rawMeta.get("fallbackReason")) : str(rawMeta.get("crawlError")));
+        url.put("priceText", str(snapshot.get("price_text")));
+        url.put("reviewCount", rawMeta.get("reviewCount"));
+        url.put("ratingScore", rawMeta.get("ratingScore") != null
+                ? rawMeta.get("ratingScore") : rawMeta.get("satisfactionScore"));
+        url.put("deliveryType", rawMeta.get("deliveryType"));
+        url.put("shippingAmount", rawMeta.get("product_shipping_amount"));
+        url.put("note", captured
+                ? "URL 직접 추출 데이터입니다. 가격, 후기, 평점, 배송비가 있으면 이 값을 최우선으로 사용합니다."
+                : screenshotPrimary
+                ? "업로드된 상세페이지 전체 캡처 이미지를 1차 근거로 사용합니다. URL 데이터가 아니라 이미지 OCR/시각 분석 데이터로 판단하십시오."
+                : "URL 직접 추출이 실패했거나 확인되지 않았습니다. 후기/평점 부재를 사실로 단정하지 마십시오.");
+        evidence.put("url", url);
+
+        Map<String, Object> priceRules = new LinkedHashMap<>();
+        priceRules.put("priceTrustSeparation", "원산지/수입육 신뢰도는 trustScore에서 다루고 priceAcceptanceScore를 직접 낮추는 근거로 쓰지 않습니다.");
+        priceRules.put("shippingRule", "가격 경쟁력은 배송비 포함 실구매가를 우선합니다. 배송비가 미확인인 경우 표시가 기준 가격과 불확실성을 함께 언급합니다.");
+        priceRules.put("reviewRule", "reviewCount/ratingScore가 없더라도 URL 크롤링 실패라면 '후기 부재'라고 쓰지 말고 '후기 확인 실패/미확인'으로 표현합니다.");
+        priceRules.put("freshFoodReturnRule", "냉동/신선식품의 단순 변심 반품 제한은 일반적인 카테고리 조건으로 다루고 과도한 리스크로 강조하지 않습니다.");
+        evidence.put("evaluationRules", priceRules);
+
+        Map<String, Object> shopping = new LinkedHashMap<>();
+        Map<String, Object> priceAnalysis = parseJsonMap(str(shoppingEvidence.get("analysis_price_analysis_json")));
+        Map<String, Object> reportContext = parseJsonMap(str(shoppingEvidence.get("analysis_report_context_json")));
+        shopping.put("used", !shoppingEvidence.isEmpty());
+        shopping.put("candidateCount", shoppingEvidence.get("candidate_count"));
+        shopping.put("priceAnalysis", priceAnalysis);
+        shopping.put("reportContext", reportContext);
+        shopping.put("comparisonProducts", summarizeShoppingProducts(shoppingProducts, 12));
+        shopping.put("shippingDataAvailable", false);
+        shopping.put("shippingDataNote", "현재 네이버 쇼핑 저장 스키마에는 배송비, 무료배송 여부, 조건부 무료배송 기준, 리뷰 수, 평점이 없습니다.");
+        shopping.put("usageRule", "네이버 쇼핑은 보조 가격 근거입니다. 원산지/부위/중량/냉장·냉동/배송비 조건이 다르면 가격 점수에 강하게 반영하지 않습니다.");
+        evidence.put("shopping", shopping);
+
+        Map<String, Object> image = new LinkedHashMap<>();
+        image.put("count", imageAnalyses != null ? imageAnalyses.size() : 0);
+        image.put("visibleOnlyRule", "이미지 근거는 OCR/시각 분석으로 실제 보이는 정보만 사용합니다. URL 상세 본문, 리뷰, 평점, 배송비와 섞지 않습니다.");
+        image.put("items", summarizeImageAnalyses(imageAnalyses, 8));
+        evidence.put("image", image);
+
+        evidence.put("sourcePriority", List.of(
+                "URL_EXTRACTED_OBJECTIVE_DATA",
+                "IMAGE_OCR_OR_VISION_DATA",
+                "NAVER_SHOPPING_COMPARISON_DATA",
+                "LLM_INFERENCE"));
+        return evidence;
+    }
+
+    private List<Map<String, Object>> summarizeShoppingProducts(List<Map<String, Object>> products, int limit) {
+        if (products == null || products.isEmpty()) return List.of();
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (Map<String, Object> product : products) {
+            if (rows.size() >= limit) break;
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("title", compact(firstNonBlank(str(product.get("title_clean")), str(product.get("title_raw"))), 180));
+            row.put("mallName", str(product.get("mall_name")));
+            row.put("price", product.get("lprice"));
+            row.put("category", List.of(str(product.get("category1")), str(product.get("category2")),
+                    str(product.get("category3")), str(product.get("category4"))).stream()
+                    .filter(s -> !s.isBlank()).collect(Collectors.joining(">")));
+            row.put("candidateScore", product.get("candidate_score"));
+            row.put("roles", str(product.get("roles")));
+            row.put("shippingFee", null);
+            row.put("reviewCount", null);
+            row.put("ratingScore", null);
+            rows.add(row);
+        }
+        return rows;
+    }
+
+    private List<Map<String, Object>> summarizeImageAnalyses(List<Map<String, Object>> imageAnalyses, int limit) {
+        if (imageAnalyses == null || imageAnalyses.isEmpty()) return List.of();
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (Map<String, Object> image : imageAnalyses) {
+            if (rows.size() >= limit) break;
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("imagePath", str(image.get("imagePath")));
+            row.put("imageSummary", compact(str(image.get("imageSummary")), 280));
+            row.put("visibleText", compact(str(image.get("visibleText")), 280));
+            row.put("visiblePrices", image.get("visiblePrices"));
+            row.put("informationGaps", image.get("informationGaps"));
+            rows.add(row);
+        }
+        return rows;
     }
 
     private Map<String, Object> extractProfileData(Object productProfile) {
@@ -1586,6 +1717,12 @@ public class PipelineJavaService {
     }
 
     private String str(Object o) { return o != null ? o.toString().trim() : ""; }
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (!str(value).isBlank()) return str(value);
+        }
+        return "";
+    }
     private Long longVal(Object o) {
         if (o instanceof Number n) return n.longValue();
         if (o instanceof String s) try { return Long.parseLong(s); } catch (Exception e) { return null; }

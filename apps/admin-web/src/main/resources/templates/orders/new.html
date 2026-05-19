@@ -64,11 +64,12 @@
         </div>
 
         <div class="field">
-            <label for="images">상세페이지 이미지</label>
+            <label for="images">상세페이지 전체 캡처 이미지</label>
             <div class="image-upload-zone" id="imageUploadZone" style="border:2px dashed #d1d5db;border-radius:10px;padding:24px;text-align:center;cursor:pointer;background:#f9fafb;transition:border-color 0.2s">
-                <p style="margin:0 0 4px;font-size:0.9rem;color:#6b7280">클릭해서 이미지를 선택하거나, 이미지를 여기로 끌어오세요</p>
-                <p style="margin:0;font-size:0.78rem;color:#9ca3af">WebP, PNG, JPG · 장당 최대 10MB · 최대 10장</p>
+                <p style="margin:0 0 4px;font-size:0.9rem;color:#6b7280">스마트스토어/쿠팡은 상세페이지 전체 화면을 캡처해서 올려 주세요</p>
+                <p style="margin:0;font-size:0.78rem;color:#9ca3af">PNG, JPG, WebP를 선택하면 업로드 전에 WebP로 자동 압축됩니다 · 최대 10장</p>
                 <p id="fileCount" style="margin:8px 0 0;font-size:0.85rem;font-weight:600;color:#2563eb;display:none"></p>
+                <p id="convertStatus" style="margin:6px 0 0;font-size:0.78rem;color:#64748b;display:none"></p>
                 <div id="imagePreview" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;justify-content:center"></div>
             </div>
             <input id="images" type="file" name="images" multiple
@@ -78,18 +79,136 @@
         </div>
 
         <script>
-        var zone=document.getElementById('imageUploadZone'),input=document.getElementById('images');
-        zone.addEventListener('click',function(){input.click()});
-        zone.addEventListener('dragover',function(e){e.preventDefault();zone.style.borderColor='#2563eb'});
-        zone.addEventListener('dragleave',function(){zone.style.borderColor='#d1d5db'});
-        zone.addEventListener('drop',function(e){e.preventDefault();zone.style.borderColor='#d1d5db';input.files=e.dataTransfer.files;showFiles()});
-        input.addEventListener('change',showFiles);
-        function showFiles(){
-            var count=input.files.length,fc=document.getElementById('fileCount'),pv=document.getElementById('imagePreview');
-            if(count>0){fc.textContent=count+'개 파일 선택됨';fc.style.display='block'}else{fc.style.display='none'}
-            pv.innerHTML='';for(var i=0;i<Math.min(count,5);i++){var r=new FileReader();r.onload=(function(f){return function(e){var img=document.createElement('img');img.src=e.target.result;img.style.cssText='width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb';pv.appendChild(img)}})(input.files[i]);r.readAsDataURL(input.files[i])}
-            if(count>5){var more=document.createElement('span');more.textContent='+'+(count-5)+'장';more.style.cssText='display:flex;align-items:center;justify-content:center;width:80px;height:80px;background:#e5e7eb;border-radius:6px;font-size:0.85rem;font-weight:600;color:#6b7280';pv.appendChild(more)}
-        }
+        (function(){
+            var zone=document.getElementById('imageUploadZone');
+            var input=document.getElementById('images');
+            var form=document.querySelector('form.form');
+            var submitButton=form ? form.querySelector('button[type="submit"]') : null;
+            var convertStatus=document.getElementById('convertStatus');
+            var converting=false;
+            var conversionPromise=Promise.resolve();
+            var maxWidth=1600;
+            var maxPixels=24000000;
+            var webpQuality=0.82;
+
+            zone.addEventListener('click',function(){ if(!converting) input.click(); });
+            zone.addEventListener('dragover',function(e){e.preventDefault();zone.style.borderColor='#2563eb';});
+            zone.addEventListener('dragleave',function(){zone.style.borderColor='#d1d5db';});
+            zone.addEventListener('drop',function(e){
+                e.preventDefault();
+                zone.style.borderColor='#d1d5db';
+                conversionPromise=convertAndSetFiles(e.dataTransfer.files);
+            });
+            input.addEventListener('change',function(){conversionPromise=convertAndSetFiles(input.files);});
+            if(form){
+                form.addEventListener('submit',function(e){
+                    if(!converting) return;
+                    e.preventDefault();
+                    conversionPromise.then(function(){ HTMLFormElement.prototype.submit.call(form); });
+                });
+            }
+
+            async function convertAndSetFiles(fileList){
+                var files=Array.prototype.slice.call(fileList || []).filter(Boolean);
+                if(files.length===0){showFiles();return;}
+                setConverting(true,'이미지를 WebP로 압축하는 중입니다...');
+                try{
+                    var converted=[];
+                    for(var i=0;i<files.length;i++){
+                        setConverting(true,'이미지를 WebP로 압축하는 중입니다... ('+(i+1)+'/'+files.length+')');
+                        converted.push(await toWebpFile(files[i]));
+                    }
+                    setInputFiles(converted);
+                    showFiles();
+                    var saved=files.reduce(function(sum,f,idx){return sum+Math.max(0,f.size-(converted[idx]?converted[idx].size:f.size));},0);
+                    setStatus('WebP 변환 완료' + (saved>0 ? ' · 약 '+formatBytes(saved)+' 절감' : ''), false);
+                }catch(err){
+                    setStatus('WebP 변환에 실패해 원본 이미지로 업로드합니다.', false);
+                    setInputFiles(files);
+                    showFiles();
+                }finally{
+                    setConverting(false);
+                }
+            }
+
+            function toWebpFile(file){
+                if(!file || !file.type || file.type.indexOf('image/')!==0) return Promise.resolve(file);
+                return loadImage(file).then(function(img){
+                    var pixelScale=Math.sqrt(maxPixels / Math.max(1, img.width * img.height));
+                    var scale=Math.min(1, maxWidth / img.width, pixelScale);
+                    var canvas=document.createElement('canvas');
+                    canvas.width=Math.max(1, Math.round(img.width * scale));
+                    canvas.height=Math.max(1, Math.round(img.height * scale));
+                    var ctx=canvas.getContext('2d');
+                    ctx.drawImage(img,0,0,canvas.width,canvas.height);
+                    return new Promise(function(resolve){
+                        canvas.toBlob(function(blob){
+                            URL.revokeObjectURL(img.src);
+                            if(!blob){ resolve(file); return; }
+                            var name=(file.name || 'detail-page').replace(/\.[^.]+$/,'')+'.webp';
+                            resolve(new File([blob], name, {type:'image/webp', lastModified:Date.now()}));
+                        }, 'image/webp', webpQuality);
+                    });
+                }).catch(function(){ return file; });
+            }
+
+            function loadImage(file){
+                return new Promise(function(resolve,reject){
+                    var img=new Image();
+                    img.onload=function(){resolve(img);};
+                    img.onerror=reject;
+                    img.src=URL.createObjectURL(file);
+                });
+            }
+
+            function setInputFiles(files){
+                if(typeof DataTransfer==='undefined') return;
+                var dt=new DataTransfer();
+                files.forEach(function(file){dt.items.add(file);});
+                input.files=dt.files;
+            }
+
+            function showFiles(){
+                var count=input.files.length,fc=document.getElementById('fileCount'),pv=document.getElementById('imagePreview');
+                if(count>0){fc.textContent=count+'개 파일 선택됨';fc.style.display='block';}else{fc.style.display='none';}
+                pv.innerHTML='';
+                for(var i=0;i<Math.min(count,5);i++){
+                    var r=new FileReader();
+                    r.onload=(function(f){return function(e){
+                        var img=document.createElement('img');
+                        img.src=e.target.result;
+                        img.title=f.name+' · '+formatBytes(f.size);
+                        img.style.cssText='width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb';
+                        pv.appendChild(img);
+                    };})(input.files[i]);
+                    r.readAsDataURL(input.files[i]);
+                }
+                if(count>5){
+                    var more=document.createElement('span');
+                    more.textContent='+'+(count-5)+'장';
+                    more.style.cssText='display:flex;align-items:center;justify-content:center;width:80px;height:80px;background:#e5e7eb;border-radius:6px;font-size:0.85rem;font-weight:600;color:#6b7280';
+                    pv.appendChild(more);
+                }
+            }
+
+            function setConverting(active,message){
+                converting=active;
+                if(submitButton) submitButton.disabled=active;
+                if(message) setStatus(message,true);
+            }
+
+            function setStatus(message,visible){
+                if(!convertStatus) return;
+                convertStatus.textContent=message || '';
+                convertStatus.style.display=(visible || message) ? 'block' : 'none';
+            }
+
+            function formatBytes(bytes){
+                if(bytes<1024) return bytes+'B';
+                if(bytes<1024*1024) return Math.round(bytes/1024)+'KB';
+                return (bytes/1024/1024).toFixed(1)+'MB';
+            }
+        })();
         </script>
 
         <div class="field">

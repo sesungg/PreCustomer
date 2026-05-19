@@ -15,6 +15,7 @@ import static org.mockito.Mockito.when;
 import com.example.personareport.modules.shopping.service.ShoppingSearchService;
 import com.example.personareport.order.service.OrderService;
 import com.example.personareport.report.domain.PipelineProgress;
+import com.example.personareport.report.delivery.service.ReportDeliveryService;
 import com.example.personareport.report.job.ReportJobService;
 import com.example.personareport.report.pipeline.PipelineJavaService;
 import com.example.personareport.report.pipeline.PipelineQueryService;
@@ -48,13 +49,16 @@ class ReportPipelineServiceResumeTest {
     private OrderService orderService;
     @Mock
     private ShoppingSearchService shoppingService;
+    @Mock
+    private ReportDeliveryService reportDeliveryService;
 
     private ReportPipelineService service;
 
     @BeforeEach
     void setUp() {
         service = new ReportPipelineService(
-                progressService, pipelineJava, queryService, saveService, jobService, orderService, shoppingService);
+                progressService, pipelineJava, queryService, saveService, jobService, orderService,
+                shoppingService, reportDeliveryService);
         lenient().when(progressService.save(any(PipelineProgress.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
     }
@@ -81,6 +85,7 @@ class ReportPipelineServiceResumeTest {
         verify(pipelineJava).generateReactions(eq(orderId), eq(responseVersion), eq(3), eq(true), any());
         verify(pipelineJava).generateFinalReport(orderId, responseVersion, reportVersion);
         verify(orderService).markCompleted(orderId);
+        verify(reportDeliveryService).deliverCompletedReport(orderId);
     }
 
     @Test

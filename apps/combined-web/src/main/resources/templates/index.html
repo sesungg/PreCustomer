@@ -9,7 +9,15 @@
 <body>
 <header class="site-header">
     <a class="brand" href="/">CustomerPreview</a>
-    <a class="header-link" href="/orders/new">리포트 신청하기</a>
+    <nav class="header-nav">
+        <a class="header-link" href="/orders/new">리포트 신청하기</a>
+        <a class="header-link" th:if="${loggedInUser == null}" href="/login">로그인</a>
+        <a class="header-link" th:if="${loggedInUser != null}" href="/account/reports">내 리포트</a>
+        <form th:if="${loggedInUser != null}" th:action="@{/logout}" method="post" class="inline-form">
+            <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+            <button class="link-button" type="submit">로그아웃</button>
+        </form>
+    </nav>
 </header>
 
 <main>

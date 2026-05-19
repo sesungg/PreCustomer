@@ -19,6 +19,9 @@ public class JwtPassportGlobalFilter implements GlobalFilter, Ordered {
 
     private static final List<String> PUBLIC_PREFIXES = List.of(
             "/orders",
+            "/login",
+            "/signup",
+            "/logout",
             "/auth",
             "/actuator",
             "/css",

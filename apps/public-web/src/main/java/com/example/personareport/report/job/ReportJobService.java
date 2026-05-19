@@ -1,6 +1,7 @@
 package com.example.personareport.report.job;
 
 import jakarta.persistence.EntityManager;
+import com.example.personareport.report.event.ReportJobEventPublisher;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -23,6 +24,7 @@ public class ReportJobService implements ReportJobQueue {
     private final ReportJobStepRepository stepRepository;
     private final JdbcTemplate jdbc;
     private final EntityManager entityManager;
+    private final ReportJobEventPublisher eventPublisher;
 
     @Override
     @Transactional
@@ -32,7 +34,9 @@ public class ReportJobService implements ReportJobQueue {
         if (active.isPresent()) {
             return active.get();
         }
-        return jobRepository.save(ReportJob.detailPageReport(orderId, forceRegenerate, hasImages));
+        ReportJob saved = jobRepository.save(ReportJob.detailPageReport(orderId, forceRegenerate, hasImages));
+        eventPublisher.publishQueued(saved);
+        return saved;
     }
 
     @Override
@@ -168,7 +172,8 @@ public class ReportJobService implements ReportJobQueue {
     public void complete(Long jobId) {
         jobRepository.findById(jobId).ifPresent(job -> {
             job.complete();
-            jobRepository.save(job);
+            ReportJob saved = jobRepository.save(job);
+            eventPublisher.publishCompleted(saved);
         });
     }
 
@@ -209,7 +214,8 @@ public class ReportJobService implements ReportJobQueue {
         if (stepRepository.countByJobId(jobId) > 0) return;
         List<ReportJobStep> steps = new ArrayList<>();
         int order = 1;
-        steps.add(ReportJobStep.create(jobId, "crawl", order++, "URL 페이지 크롤링"));
+        steps.add(ReportJobStep.create(jobId, "crawl", order++,
+                hasImages ? "상세페이지 캡처 분석 준비" : "URL 페이지 크롤링"));
         steps.add(ReportJobStep.create(jobId, "shopping", order++, "네이버 쇼핑 경쟁 상품 분석"));
         if (hasImages) {
             steps.add(ReportJobStep.create(jobId, "image_analysis", order++, "이미지 분석"));

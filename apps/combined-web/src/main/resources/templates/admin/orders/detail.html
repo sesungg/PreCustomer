@@ -139,7 +139,7 @@
     </div>
 
     <section class="panel" th:if="${imageFilenames != null && !imageFilenames.isEmpty()}">
-        <h2>업로드 이미지</h2>
+        <h2>상세페이지 전체 캡처 이미지</h2>
         <div class="image-gallery">
             <div th:each="filename : ${imageFilenames}" class="image-item">
                 <img th:src="@{/uploads/{name}(name=${filename})}"

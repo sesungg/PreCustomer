@@ -209,7 +209,8 @@ public class ReportJobService implements ReportJobQueue {
         if (stepRepository.countByJobId(jobId) > 0) return;
         List<ReportJobStep> steps = new ArrayList<>();
         int order = 1;
-        steps.add(ReportJobStep.create(jobId, "crawl", order++, "URL 페이지 크롤링"));
+        steps.add(ReportJobStep.create(jobId, "crawl", order++,
+                hasImages ? "상세페이지 캡처 분석 준비" : "URL 페이지 크롤링"));
         steps.add(ReportJobStep.create(jobId, "shopping", order++, "네이버 쇼핑 경쟁 상품 분석"));
         if (hasImages) {
             steps.add(ReportJobStep.create(jobId, "image_analysis", order++, "이미지 분석"));

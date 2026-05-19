@@ -10,4 +10,9 @@ public interface ReactionReportOrderRepository extends JpaRepository<ReactionRep
     List<ReactionReportOrder> findAllByOrderByCreatedAtDesc();
 
     List<ReactionReportOrder> findByStatusOrderByCreatedAtDesc(OrderStatus status);
+
+    List<ReactionReportOrder> findByCustomerAccountIdOrCustomerEmailIgnoreCaseOrderByCreatedAtDesc(
+            Long customerAccountId,
+            String customerEmail
+    );
 }

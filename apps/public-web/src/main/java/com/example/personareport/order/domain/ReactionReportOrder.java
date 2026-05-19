@@ -26,6 +26,8 @@ public class ReactionReportOrder extends BaseTimeEntity {
     @Column(nullable = false)
     private String customerEmail;
 
+    private Long customerAccountId;
+
     @Column(nullable = false)
     private String projectName;
 
@@ -120,6 +122,13 @@ public class ReactionReportOrder extends BaseTimeEntity {
 
     public void setImagePaths(String imagePaths) {
         this.imagePaths = imagePaths;
+    }
+
+    public void attachCustomerAccount(Long customerAccountId, String email) {
+        this.customerAccountId = customerAccountId;
+        if (email != null && !email.isBlank()) {
+            this.customerEmail = email.trim().toLowerCase();
+        }
     }
 
     public void markPaid() {

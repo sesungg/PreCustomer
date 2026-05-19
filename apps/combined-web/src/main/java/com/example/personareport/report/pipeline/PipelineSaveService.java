@@ -12,7 +12,10 @@ import com.example.personareport.report.pipeline.repository.ProductTargetProfile
 import com.example.personareport.report.pipeline.repository.SelectedPersonaRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
+import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -93,6 +96,75 @@ public class PipelineSaveService {
     @Transactional
     public void resetSelectedPersonas(Long orderId) {
         selectedPersonaRepo.deleteByReportOrderId(orderId);
+    }
+
+    /**
+     * 상세페이지 전체 캡처 이미지가 있는 주문은 URL 크롤링 없이,
+     * 업로드 이미지 분석 결과를 묶어 줄 기준 snapshot만 생성한다.
+     */
+    @Transactional
+    public void upsertScreenshotPrimarySnapshot(Long orderId, List<Path> imagePaths) {
+        Map<String, Object> order = jdbc.queryForList("SELECT * FROM report_order WHERE id = ?", orderId)
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("report_order를 찾을 수 없습니다. order_id=" + orderId));
+
+        String pageUrl = nonBlank(str(order.get("page_url")), "manual://report-order/" + orderId);
+        String projectName = str(order.get("project_name"));
+        String priceText = str(order.get("price_text"));
+        List<String> uploadedImages = normalizeImagePaths(order, imagePaths);
+        List<Map<String, Object>> importantImages = uploadedImages.stream()
+                .map(path -> {
+                    Map<String, Object> image = new LinkedHashMap<String, Object>();
+                    image.put("path", path);
+                    image.put("role", "DETAIL_PAGE_SCREENSHOT");
+                    image.put("source", "report_order.image_paths");
+                    return image;
+                })
+                .toList();
+
+        String visibleText = joinNonBlank(Arrays.asList(
+                projectName != null ? "상품명: " + projectName : null,
+                str(order.get("one_line_description")) != null ? "한 줄 설명: " + str(order.get("one_line_description")) : null,
+                str(order.get("detail_description")) != null ? "상세 설명: " + str(order.get("detail_description")) : null,
+                priceText != null ? "가격: " + priceText : null,
+                str(order.get("target_customer")) != null ? "타겟 고객: " + str(order.get("target_customer")) : null,
+                str(order.get("main_question")) != null ? "핵심 질문: " + str(order.get("main_question")) : null,
+                "업로드 캡처 이미지 수: " + uploadedImages.size(),
+                "원본 URL: " + pageUrl
+        ));
+        Map<String, Object> rawMeta = new LinkedHashMap<>();
+        rawMeta.put("fallbackSource", "report_order");
+        rawMeta.put("fallbackReason", "SCREENSHOT_PRIMARY");
+        rawMeta.put("analysisMode", "SCREENSHOT_PRIMARY");
+        rawMeta.put("uploadedImageCount", uploadedImages.size());
+        rawMeta.put("uploadedImages", uploadedImages);
+
+        jdbc.update("""
+                INSERT INTO page_snapshot (
+                    report_order_id, page_url, source_site, snapshot_status,
+                    page_title, product_title, price_text,
+                    visible_text, extracted_text_summary, image_urls, important_images,
+                    raw_meta_json, captured_at
+                ) VALUES (?,?,?,?, ?,?,?, ?,?, CAST(? AS jsonb), CAST(? AS jsonb), CAST(? AS jsonb), CURRENT_TIMESTAMP)
+                ON CONFLICT (report_order_id) DO UPDATE SET
+                    page_url = EXCLUDED.page_url,
+                    source_site = EXCLUDED.source_site,
+                    snapshot_status = EXCLUDED.snapshot_status,
+                    page_title = EXCLUDED.page_title,
+                    product_title = EXCLUDED.product_title,
+                    price_text = EXCLUDED.price_text,
+                    visible_text = EXCLUDED.visible_text,
+                    extracted_text_summary = EXCLUDED.extracted_text_summary,
+                    image_urls = EXCLUDED.image_urls,
+                    important_images = EXCLUDED.important_images,
+                    raw_meta_json = EXCLUDED.raw_meta_json,
+                    captured_at = EXCLUDED.captured_at
+                """,
+                orderId, pageUrl, nonBlank(extractDomain(pageUrl), "manual"), "SCREENSHOT_PRIMARY",
+                projectName, projectName, priceText,
+                visibleText, truncate(visibleText, 2000),
+                toJson(List.of()), toJson(importantImages), toJson(rawMeta));
     }
 
     /** selected_persona 배치 저장. target_profile_id 컬럼에는 product_target_profile.id를 저장한다. */
@@ -353,6 +425,42 @@ public class PipelineSaveService {
     }
 
     private String str(Object o) { return o != null ? o.toString() : null; }
+    private String nonBlank(String value, String fallback) {
+        return value != null && !value.isBlank() ? value : fallback;
+    }
+
+    private String joinNonBlank(List<String> values) {
+        return values.stream()
+                .filter(value -> value != null && !value.isBlank())
+                .reduce((left, right) -> left + "\n" + right)
+                .orElse("");
+    }
+
+    private String truncate(String value, int maxLength) {
+        if (value == null || value.length() <= maxLength) return value;
+        return value.substring(0, maxLength);
+    }
+
+    private List<String> normalizeImagePaths(Map<String, Object> order, List<Path> imagePaths) {
+        if (imagePaths != null && !imagePaths.isEmpty()) {
+            return imagePaths.stream()
+                    .map(path -> path.toAbsolutePath().toString())
+                    .toList();
+        }
+        String raw = str(order.get("image_paths"));
+        if (raw == null || raw.isBlank()) return List.of();
+        return raw.lines()
+                .map(String::trim)
+                .filter(line -> !line.isBlank())
+                .toList();
+    }
+
+    private String extractDomain(String url) {
+        if (url == null) return null;
+        var matcher = java.util.regex.Pattern.compile("https?://([^/]+)").matcher(url);
+        return matcher.find() ? matcher.group(1) : null;
+    }
+
     private Long longVal(Object o) {
         if (o instanceof Number n) return n.longValue();
         if (o != null) try { return Long.parseLong(o.toString()); } catch (Exception ignored) {}

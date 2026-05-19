@@ -12,6 +12,7 @@ import com.example.personareport.report.repository.PersonaProfileRepository;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -471,6 +472,14 @@ public class PipelineQueryService {
     }
 
     @Transactional(readOnly = true)
+    public boolean hasScreenshotPrimarySnapshot(Long orderId) {
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM page_snapshot WHERE report_order_id = ? AND snapshot_status = 'SCREENSHOT_PRIMARY'",
+                Integer.class, orderId);
+        return count != null && count > 0;
+    }
+
+    @Transactional(readOnly = true)
     public boolean hasImageAnalysesForPaths(Long orderId, List<String> imagePaths) {
         if (imagePaths == null || imagePaths.isEmpty()) return true;
         String placeholders = String.join(",", Collections.nCopies(imagePaths.size(), "?"));
@@ -495,6 +504,72 @@ public class PipelineQueryService {
                 WHERE g.report_id = ?
                 """, Integer.class, orderId);
         return count != null && count > 0;
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> findLatestShoppingEvidence(Long orderId) {
+        var groups = jdbc.queryForList(
+                "SELECT * FROM shopping_search_group WHERE report_id = ? ORDER BY id DESC LIMIT 1",
+                orderId);
+        if (groups.isEmpty()) return Collections.emptyMap();
+
+        var evidence = new LinkedHashMap<String, Object>(groups.get(0));
+        var analyses = jdbc.queryForList(
+                "SELECT * FROM shopping_market_analysis_snapshot WHERE search_group_id = ? ORDER BY id DESC LIMIT 1",
+                evidence.get("id"));
+        if (!analyses.isEmpty()) {
+            analyses.get(0).forEach((key, value) -> evidence.put("analysis_" + key, value));
+        }
+        return evidence;
+    }
+
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> findShoppingComparisonProducts(Long orderId, int limit) {
+        try {
+            return jdbc.queryForList("""
+                    WITH latest_group AS (
+                        SELECT id
+                        FROM shopping_search_group
+                        WHERE report_id = ?
+                        ORDER BY id DESC
+                        LIMIT 1
+                    )
+                    SELECT cp.id AS candidate_id,
+                           cp.candidate_score,
+                           cp.category_match_score,
+                           cp.title_similarity_score,
+                           cp.price_range_score,
+                           cp.data_confidence AS candidate_confidence,
+                           cp.candidate_reason,
+                           ps.title_clean,
+                           ps.title_raw,
+                           ps.mall_name,
+                           ps.lprice,
+                           ps.hprice,
+                           ps.brand_raw,
+                           ps.maker_raw,
+                           ps.category1,
+                           ps.category2,
+                           ps.category3,
+                           ps.category4,
+                           ps.sort_type,
+                           ps.original_rank,
+                           ps.data_quality_score,
+                           ps.data_confidence,
+                           STRING_AGG(cpr.role_type, ', ' ORDER BY cpr.role_type) AS roles
+                    FROM shopping_candidate_product cp
+                    JOIN shopping_product_snapshot ps ON ps.id = cp.product_snapshot_id
+                    LEFT JOIN shopping_candidate_product_role cpr ON cpr.candidate_product_id = cp.id
+                    WHERE cp.search_group_id = (SELECT id FROM latest_group)
+                    GROUP BY cp.id, ps.id
+                    ORDER BY cp.candidate_score DESC, ps.lprice ASC NULLS LAST
+                    LIMIT ?
+                    """, orderId, limit);
+        } catch (Exception e) {
+            log.debug("[findShoppingComparisonProducts] 비교 상품 조회 생략 orderId={}, reason={}",
+                    orderId, e.getMessage());
+            return Collections.emptyList();
+        }
     }
 
     // ── Page Snapshot by order ────────────────────────────────────
