@@ -26,7 +26,10 @@ public class UserAccountService {
             return userAccountRepository.save(UserAccount.create(
                     request.displayName().trim(),
                     email,
-                    passwordEncoder.encode(request.password())
+                    passwordEncoder.encode(request.password()),
+                    Boolean.TRUE.equals(request.termsAccepted()),
+                    Boolean.TRUE.equals(request.privacyAccepted()),
+                    Boolean.TRUE.equals(request.marketingAccepted())
             ));
         } catch (DataIntegrityViolationException e) {
             throw new DuplicateEmailException("이미 가입된 이메일입니다. 로그인해 주세요.");

@@ -5,10 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>신청 완료</title>
     <link rel="stylesheet" th:href="@{/css/app.css}">
+    <th:block th:replace="~{fragments/analytics :: head}"></th:block>
 </head>
 <body>
 <header class="site-header">
-    <a class="brand" href="/">CustomerPreview</a>
+    <a class="brand" href="/">PreCustomerReport</a>
     <nav class="header-nav">
         <a class="header-link" href="/">처음으로</a>
         <a class="header-link" th:if="${loggedInUser == null}" href="/login">로그인</a>
@@ -40,7 +41,9 @@
                 <h2>리포트 받는 방법</h2>
                 <p>계정을 만들면 이후 리포트 확인과 재신청을 같은 이메일로 이어갈 수 있습니다.</p>
             </div>
-            <form class="form compact-form" th:action="@{/signup}" th:object="${signupRequest}" method="post">
+            <form class="form compact-form" th:action="@{/signup}" th:object="${signupRequest}" method="post"
+                  data-analytics-event="signup_after_order_submitted" data-analytics-category="auth"
+                  th:attr="data-analytics-report-order-id=${order.id}">
                 <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
                 <input type="hidden" th:field="*{returnOrderId}">
                 <div class="field">
@@ -59,17 +62,31 @@
                     <label for="signupPasswordConfirm">비밀번호 확인</label>
                     <input id="signupPasswordConfirm" type="password" th:field="*{passwordConfirm}" autocomplete="new-password">
                 </div>
-                <button class="button primary full" type="submit">회원가입하고 리포트 받기</button>
+                <label class="checkbox">
+                    <input type="checkbox" th:field="*{termsAccepted}">
+                    <span>[필수] 서비스 이용약관에 동의합니다.</span>
+                </label>
+                <label class="checkbox">
+                    <input type="checkbox" th:field="*{privacyAccepted}">
+                    <span>[필수] 개인정보 수집 및 이용에 동의합니다.</span>
+                </label>
+                <label class="checkbox">
+                    <input type="checkbox" th:field="*{marketingAccepted}">
+                    <span>[선택] 리포트 활용 팁, 기능 업데이트, 이벤트 안내를 이메일로 받겠습니다.</span>
+                </label>
+                <button class="button primary full" type="submit" data-analytics-event="signup_after_order_clicked" data-analytics-category="auth" th:attr="data-analytics-report-order-id=${order.id}">회원가입하고 리포트 받기</button>
             </form>
             <div class="divider-text">또는</div>
-            <form class="form compact-form" th:action="@{/orders/{id}/delivery-email(id=${order.id})}" method="post">
+            <form class="form compact-form" th:action="@{/orders/{id}/delivery-email(id=${order.id})}" method="post"
+                  data-analytics-event="delivery_email_form_submitted" data-analytics-category="delivery"
+                  th:attr="data-analytics-report-order-id=${order.id}">
                 <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
                 <div class="field">
                     <label for="deliveryEmail">완성 리포트를 받을 이메일</label>
                     <input id="deliveryEmail" type="email" name="email" th:value="${deliveryEmail}" autocomplete="email">
                     <p class="field-error" th:if="${deliveryError != null}" th:text="${deliveryError}"></p>
                 </div>
-                <button class="button secondary full" type="submit">이메일만 남기기</button>
+                <button class="button secondary full" type="submit" data-analytics-event="delivery_email_save_clicked" data-analytics-category="delivery" th:attr="data-analytics-report-order-id=${order.id}">이메일만 남기기</button>
             </form>
         </section>
 
@@ -79,7 +96,7 @@
             <p class="muted-text" th:text="${loggedInUser.email}"></p>
         </section>
 
-        <a class="button secondary" href="/">서비스 소개로 돌아가기</a>
+        <a class="button secondary" href="/" data-analytics-event="home_clicked" data-analytics-category="completion">서비스 소개로 돌아가기</a>
     </div>
 </main>
 </body>

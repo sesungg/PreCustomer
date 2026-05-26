@@ -16,7 +16,6 @@ rootProject.name = 'precustomer'
 
 include 'modules:precustomer-contracts'
 include 'apps:api-gateway'
-include 'apps:combined-web'
 include 'apps:public-web'
 include 'apps:admin-web'
 include 'apps:report-worker'

@@ -44,6 +44,8 @@ management:
         enabled: true
       show-details: never
   health:
+    mail:
+      enabled: ${MAIL_HEALTH_ENABLED:${REPORT_DELIVERY_MAIL_ENABLED:false}}
     livenessstate:
       enabled: true
     readinessstate:
@@ -199,39 +201,6 @@ server:
 spring:
   config:
     activate:
-      on-profile: web
-  application:
-    name: precustomer-web
-  main:
-    web-application-type: servlet
-app:
-  pipeline:
-    worker-enabled: ${REPORT_PIPELINE_WORKER_ENABLED:false}
-server:
-  port: ${PORT:8080}
-
----
-spring:
-  config:
-    activate:
-      on-profile: public-web
-  application:
-    name: precustomer-public-web
-  main:
-    web-application-type: servlet
-app:
-  web:
-    public-enabled: ${APP_WEB_PUBLIC_ENABLED:true}
-    admin-enabled: ${APP_WEB_ADMIN_ENABLED:false}
-  pipeline:
-    worker-enabled: ${REPORT_PIPELINE_WORKER_ENABLED:false}
-server:
-  port: ${PUBLIC_PORT:${PORT:8080}}
-
----
-spring:
-  config:
-    activate:
       on-profile: admin-web
   application:
     name: precustomer-admin-web
@@ -245,19 +214,3 @@ app:
     worker-enabled: ${REPORT_PIPELINE_WORKER_ENABLED:false}
 server:
   port: ${ADMIN_PORT:8081}
-
----
-spring:
-  config:
-    activate:
-      on-profile: worker
-  application:
-    name: precustomer-report-worker
-  main:
-    web-application-type: none
-app:
-  web:
-    public-enabled: false
-    admin-enabled: false
-  pipeline:
-    worker-enabled: ${REPORT_PIPELINE_WORKER_ENABLED:true}

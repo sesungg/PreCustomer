@@ -2,8 +2,6 @@ package com.example.personareport.common.config;
 
 import java.util.Arrays;
 import lombok.extern.slf4j.Slf4j;
-import com.example.personareport.user.domain.UserAccount;
-import com.example.personareport.user.repository.UserAccountRepository;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -37,32 +35,27 @@ public class SecurityConfig {
         http
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PathRequest.toStaticResources().atCommonLocations()).permitAll()
-                        .requestMatchers("/", "/orders/**", "/login", "/signup", "/error", "/favicon.ico").permitAll()
+                        .requestMatchers("/admin/login", "/error", "/favicon.ico").permitAll()
                         .requestMatchers("/actuator/health/**").permitAll()
                         .requestMatchers("/h2-console/**").permitAll()
-                        .requestMatchers("/account/**").hasRole("USER")
                         .requestMatchers("/admin/**", "/api/shopping/naver/**", "/uploads/**").hasRole("ADMIN")
                         .anyRequest().denyAll()
                 )
                 .formLogin(form -> form
-                        .loginPage("/login")
-                        .successHandler((request, response, authentication) -> {
-                            boolean admin = authentication.getAuthorities().stream()
-                                    .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
-                            response.sendRedirect(admin ? "/admin/orders" : "/orders/new");
-                        })
+                        .loginPage("/admin/login")
+                        .loginProcessingUrl("/admin/login")
+                        .successHandler((request, response, authentication) -> response.sendRedirect("/admin/orders"))
                         .permitAll()
                 )
                 .logout(logout -> logout
                         .logoutRequestMatcher(new OrRequestMatcher(
-                                new AntPathRequestMatcher("/logout", "POST"),
                                 new AntPathRequestMatcher("/admin/logout", "POST")
                         ))
-                        .logoutSuccessUrl("/")
+                        .logoutSuccessUrl("/admin/login?logout")
                         .permitAll()
                 )
                 .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
-                .csrf(csrf -> csrf.ignoringRequestMatchers("/h2-console/**"))
+                .csrf(csrf -> csrf.ignoringRequestMatchers("/h2-console/**", "/admin/login"))
                 .addFilterBefore(gatewayPassportAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
@@ -70,8 +63,7 @@ public class SecurityConfig {
 
     @Bean
     UserDetailsService userDetailsService(AdminSecurityProperties properties,
-                                          PasswordEncoder passwordEncoder,
-                                          UserAccountRepository userAccountRepository) {
+                                          PasswordEncoder passwordEncoder) {
         var admin = User.withUsername(properties.username())
                 .password(passwordEncoder.encode(properties.password()))
                 .roles("ADMIN")
@@ -80,13 +72,7 @@ public class SecurityConfig {
             if (properties.username().equals(username)) {
                 return admin;
             }
-            return userAccountRepository.findByEmail(UserAccount.normalizeEmail(username))
-                    .map(account -> User.withUsername(account.getEmail())
-                            .password(account.getPasswordHash())
-                            .roles(account.getRole())
-                            .disabled(!account.isEnabled())
-                            .build())
-                    .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다."));
+            throw new UsernameNotFoundException("관리자 계정을 찾을 수 없습니다.");
         };
     }
 

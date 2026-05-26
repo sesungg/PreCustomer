@@ -5,10 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title th:text="${order.projectName} + ' | 최종 리포트'">최종 리포트</title>
     <link rel="stylesheet" th:href="@{/css/app.css}">
+    <th:block th:replace="~{fragments/analytics :: head}"></th:block>
 </head>
 <body>
 <header class="site-header">
-    <a class="brand" href="/">CustomerPreview</a>
+    <a class="brand" href="/">PreCustomerReport</a>
     <nav class="header-nav">
         <a class="header-link" href="/account/reports">내 리포트</a>
         <a class="header-link" href="/orders/new">리포트 신청하기</a>
@@ -29,8 +30,10 @@
             </p>
         </div>
         <div class="report-header-actions">
-            <button class="button secondary" type="button" onclick="window.print()" th:if="${reportReady}">인쇄</button>
-            <a class="button secondary" href="/account/reports">목록으로</a>
+            <button class="button secondary" type="button" onclick="window.print()" th:if="${reportReady}"
+                    data-analytics-event="final_report_print_clicked" data-analytics-category="report_detail"
+                    th:attr="data-analytics-report-order-id=${order.id}">인쇄</button>
+            <a class="button secondary" href="/account/reports" data-analytics-event="report_list_clicked" data-analytics-category="report_detail">목록으로</a>
         </div>
     </section>
 
@@ -40,7 +43,7 @@
             현재 상태는 <strong th:text="${order.status.label}">생성 중</strong>입니다.
             최종 리포트가 생성되면 이 화면에서 바로 확인할 수 있습니다.
         </p>
-        <a class="button primary" href="/account/reports">내 리포트로 돌아가기</a>
+        <a class="button primary" href="/account/reports" data-analytics-event="report_list_clicked" data-analytics-category="report_waiting">내 리포트로 돌아가기</a>
     </section>
 
     <section th:if="${reportReady}">

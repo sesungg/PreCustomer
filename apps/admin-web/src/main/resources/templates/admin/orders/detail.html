@@ -120,6 +120,8 @@
                 <dd><a th:if="${order.pageUrl}" th:href="${order.pageUrl}" th:text="${order.pageUrl}" target="_blank" rel="noreferrer"></a><span th:unless="${order.pageUrl}">미입력</span></dd>
                 <dt>가격 정보</dt>
                 <dd th:text="${order.priceText ?: '미입력'}"></dd>
+                <dt>배송비 정책</dt>
+                <dd class="preline" th:text="${order.shippingPolicyText ?: '미입력'}"></dd>
                 <dt>개인정보 입력 금지 동의</dt>
                 <dd th:text="${order.privacyAgreement ? '동의' : '미동의'}"></dd>
             </dl>
@@ -184,12 +186,12 @@
             stopBtn.addEventListener('click', function() {
                 stopBtn.disabled = true;
                 stopBtn.textContent = '중지 요청됨';
-                fetch('/admin/orders/' + orderId + '/stop', postOptions())
-                    .then(function(r) { return r.json(); })
+                fetchJson('/admin/orders/' + orderId + '/stop', postOptions())
                     .then(function() { startPolling(); })
-                    .catch(function() {
+                    .catch(function(error) {
                         stopBtn.disabled = false;
                         stopBtn.textContent = '생성 중지';
+                        showRequestError(error.message || '리포트 중지 요청에 실패했습니다.');
                     });
             });
         }
@@ -201,8 +203,7 @@
             var originalText = trigger.textContent;
             trigger.disabled = true;
             trigger.textContent = buttonText;
-            fetch(url, postOptions())
-                .then(function(r) { return r.json(); })
+            fetchJson(url, postOptions())
                 .then(function(data) {
                     if (data.status === 'already_running') {
                         startPolling();
@@ -212,10 +213,11 @@
                     if (progressPanel) progressPanel.style.display = 'none';
                     startPolling();
                 })
-                .catch(function() {
+                .catch(function(error) {
                     trigger.disabled = false;
                     trigger.textContent = originalText;
                     if (regenerateBtn) regenerateBtn.disabled = false;
+                    showRequestError(error.message || '리포트 생성 요청에 실패했습니다.');
                 });
         }
 
@@ -234,8 +236,7 @@
 
         function startPolling() {
             var poll = setInterval(function() {
-                fetch('/admin/orders/' + orderId + '/progress')
-                    .then(function(r) { return r.json(); })
+                fetchJson('/admin/orders/' + orderId + '/progress')
                     .then(function(data) {
                         var panel = pendingPanel || progressPanel;
                         var title = document.getElementById('progress-title');
@@ -291,6 +292,40 @@
                         }
                     });
             }, 2000);
+        }
+
+        function fetchJson(url, options) {
+            return fetch(url, options).then(function(response) {
+                if (!response.ok) {
+                    return response.text().then(function(body) {
+                        var suffix = body ? ' - ' + body.substring(0, 160) : '';
+                        throw new Error('HTTP ' + response.status + suffix);
+                    });
+                }
+                return response.json();
+            });
+        }
+
+        function showRequestError(message) {
+            var panel = pendingPanel || progressPanel;
+            var title = document.getElementById('progress-title');
+            var stepText = document.getElementById('progress-step-text');
+            var bar = document.getElementById('progress-bar-fill');
+            var stepName = document.getElementById('progress-step-name');
+            var err = document.getElementById('progress-error');
+
+            if (panel) panel.style.display = 'block';
+            if (title) title.textContent = '요청 실패';
+            if (stepText) stepText.textContent = '0/0';
+            if (bar) {
+                bar.style.width = '0%';
+                bar.className = 'progress-bar-fill failed';
+            }
+            if (stepName) stepName.textContent = '리포트 생성 요청이 서버에서 거절되었습니다.';
+            if (err) {
+                err.style.display = 'block';
+                err.textContent = message;
+            }
         }
 
         // If already in progress on page load, start polling

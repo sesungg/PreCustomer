@@ -84,11 +84,12 @@ RabbitMQ/Kafka는 아직 넣지 않는다. 대신 `ReportJobQueue` 포트를 기
 
 `precustomer-core` 모듈을 제거하고 app별 코드 소유권을 분리했다.
 
-- `public-web`, `admin-web`, `report-worker`, `combined-web`는 더 이상 공통 core Gradle 모듈에 의존하지 않는다.
+- `public-web`, `admin-web`, `report-worker`는 더 이상 공통 core Gradle 모듈에 의존하지 않는다.
 - 각 app은 자신의 controller, service, repository, template, resource를 보유한다.
 - 서비스 간 공유 코드는 `precustomer-contracts`에 남긴다.
 - 아직 DB table은 공유하므로, 서비스별 DB 완전 분리는 다음 단계에서 진행한다.
-- 이번 단계는 모듈 의존성 제거가 목표이며, 서비스별 코드 최소화는 DB/API 경계 분리와 함께 진행한다.
+- `combined-web` 모놀리식 실행 모듈은 제거하고, gateway/public/admin/worker만 실행 단위로 유지한다.
+- 이번 단계는 모듈 의존성 제거와 실행 단위 정리가 목표이며, 운영 데이터 이동은 별도 절차로 진행한다.
 
 ## 로컬 실행
 

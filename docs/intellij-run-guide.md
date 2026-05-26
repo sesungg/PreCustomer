@@ -19,7 +19,7 @@ Password: postgres
 IntelliJ Gradle tool window에서 아래 task를 실행할 수 있습니다.
 
 ```bash
-bootRun              # combined-web, 기존 단일 web 개발 실행
+bootRun              # api-gateway 실행
 bootRunPublicWeb     # public-web만 실행
 bootRunAdminWeb      # admin-web만 실행
 bootRunGateway       # api-gateway 실행
@@ -30,7 +30,6 @@ bootRunWorker        # report-worker 실행
 
 | 앱 | 포트 |
 | --- | --- |
-| Combined Web | `8080` |
 | Public Web | `8080` |
 | Admin Web | `8081` |
 | API Gateway | `8088` |
@@ -42,7 +41,6 @@ bootRunWorker        # report-worker 실행
 
 | 이름 | Main class | Program arguments | 주요 환경변수 |
 | --- | --- | --- | --- |
-| Combined Web | `com.example.personareport.CombinedWebApplication` | `--spring.profiles.active=local,web` | `ADMIN_USERNAME=admin;ADMIN_PASSWORD=local-secret` |
 | Public Web | `com.example.personareport.PublicWebApplication` | `--spring.profiles.active=local,public-web` | 필요 시 API key |
 | Admin Web | `com.example.personareport.AdminWebApplication` | `--spring.profiles.active=local,admin-web` | `ADMIN_USERNAME=admin;ADMIN_PASSWORD=local-secret` |
 | API Gateway | `com.example.personareport.gateway.ApiGatewayApplication` | `--spring.profiles.active=local,gateway` | `ADMIN_USERNAME=admin;ADMIN_PASSWORD=local-secret;GATEWAY_JWT_SECRET=dev-jwt-secret-for-intellij-32bytes;GATEWAY_PASSPORT_SECRET=dev-passport-secret-for-intellij-32bytes` |

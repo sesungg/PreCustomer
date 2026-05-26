@@ -8,7 +8,6 @@ import com.example.personareport.report.job.ReportJobStatus;
 import com.example.personareport.report.service.ImageStorageService;
 import com.example.personareport.report.service.PipelineProgressService;
 import com.example.personareport.report.service.ReportDataService;
-import com.example.personareport.report.service.ReportPipelineService;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +33,6 @@ public class AdminOrderController {
 
     private final OrderService orderService;
     private final ImageStorageService imageStorageService;
-    private final ReportPipelineService reportPipelineService;
     private final PipelineProgressService progressService;
     private final ReportJobQueue reportJobQueue;
     private final ReportDataService reportDataService;
@@ -103,7 +101,6 @@ public class AdminOrderController {
     @ResponseBody
     public ResponseEntity<Map<String, Object>> stop(@PathVariable Long id) {
         boolean accepted = reportJobQueue.requestCancelForOrder(id);
-        accepted = reportPipelineService.requestStop(id) || accepted;
         return ResponseEntity.ok(Map.of(
                 "status", accepted ? "stop_requested" : "not_running",
                 "orderId", id

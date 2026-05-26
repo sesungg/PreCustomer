@@ -5,10 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>리포트 신청하기</title>
     <link rel="stylesheet" th:href="@{/css/app.css}">
+    <th:block th:replace="~{fragments/analytics :: head}"></th:block>
 </head>
 <body>
 <header class="site-header">
-    <a class="brand" href="/">CustomerPreview</a>
+    <a class="brand" href="/">PreCustomerReport</a>
     <a class="header-link" href="/">서비스 소개</a>
 </header>
 
@@ -16,7 +17,7 @@
     <div class="page-title">
         <p class="eyebrow">베타 리포트 9,900원</p>
         <h1>리포트 신청하기</h1>
-        <p>아이디어나 판매 문구를 입력하면 AI 기반 가상고객 시뮬레이션 리포트 생성에 필요한 정보를 접수합니다.</p>
+        <p>상품 판매 상세페이지 전체 캡처 이미지를 올리면 AI 기반 가상고객 시뮬레이션 리포트 생성에 필요한 정보를 접수합니다.</p>
     </div>
 
     <div class="warning-box">
@@ -24,7 +25,8 @@
         <p>개인정보, 고객 DB, 매출자료, 계약서, 내부 기획자료, 병원·금융·법률 등 민감정보는 입력하지 마세요.</p>
     </div>
 
-    <form class="form" th:action="@{/orders}" th:object="${orderRequest}" method="post" enctype="multipart/form-data">
+    <form class="form" th:action="@{/orders}" th:object="${orderRequest}" method="post" enctype="multipart/form-data"
+          data-analytics-event="report_order_form_submitted" data-analytics-category="order">
         <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
         <div class="field">
             <label for="customerEmail">신청자 이메일</label>
@@ -33,41 +35,16 @@
         </div>
 
         <div class="field">
-            <label for="projectName">프로젝트/상품/서비스명</label>
-            <input id="projectName" type="text" th:field="*{projectName}" placeholder="예: 미리고객 베타 리포트">
+            <label for="projectName">상품명</label>
+            <input id="projectName" type="text" th:field="*{projectName}" placeholder="예: 브라질산 닭다리 정육 2kg">
             <p class="field-error" th:errors="*{projectName}"></p>
-        </div>
-
-        <div class="field">
-            <label for="targetType">분석 대상 유형</label>
-            <select id="targetType" th:field="*{targetType}">
-                <option value="">선택해 주세요</option>
-                <option th:each="type : ${targetTypes}" th:value="${type}" th:text="${type.label}"></option>
-            </select>
-            <p class="field-error" th:errors="*{targetType}"></p>
-        </div>
-
-        <div class="field">
-            <label for="oneLineDescription">한 줄 소개</label>
-            <input id="oneLineDescription" type="text" th:field="*{oneLineDescription}" placeholder="고객에게 보여줄 핵심 문장을 적어 주세요.">
-        </div>
-
-        <div class="field">
-            <label for="detailDescription">상세 설명</label>
-            <textarea id="detailDescription" rows="8" th:field="*{detailDescription}" placeholder="아이디어, 서비스, 판매페이지, 공모전 기획안의 핵심 내용을 입력해 주세요."></textarea>
-            <p class="field-error" th:if="${#fields.hasErrors('descriptionPresent')}" th:errors="*{descriptionPresent}"></p>
-        </div>
-
-        <div class="field">
-            <label for="pageUrl">페이지 URL</label>
-            <input id="pageUrl" type="url" th:field="*{pageUrl}" placeholder="https://example.com">
         </div>
 
         <div class="field">
             <label for="images">상세페이지 전체 캡처 이미지</label>
             <div class="image-upload-zone" id="imageUploadZone" style="border:2px dashed #d1d5db;border-radius:10px;padding:24px;text-align:center;cursor:pointer;background:#f9fafb;transition:border-color 0.2s">
-                <p style="margin:0 0 4px;font-size:0.9rem;color:#6b7280">스마트스토어/쿠팡은 상세페이지 전체 화면을 캡처해서 올려 주세요</p>
-                <p style="margin:0;font-size:0.78rem;color:#9ca3af">PNG, JPG, WebP를 선택하면 업로드 전에 WebP로 자동 압축됩니다 · 최대 10장</p>
+                <p style="margin:0 0 4px;font-size:0.9rem;color:#6b7280">상품 판매 상세페이지 전체 화면을 캡처해서 올려 주세요</p>
+                <p style="margin:0;font-size:0.78rem;color:#9ca3af">PNG, JPG, WebP 이미지 최대 20장</p>
                 <p id="fileCount" style="margin:8px 0 0;font-size:0.85rem;font-weight:600;color:#2563eb;display:none"></p>
                 <p id="convertStatus" style="margin:6px 0 0;font-size:0.78rem;color:#64748b;display:none"></p>
                 <div id="imagePreview" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;justify-content:center"></div>
@@ -111,19 +88,18 @@
             async function convertAndSetFiles(fileList){
                 var files=Array.prototype.slice.call(fileList || []).filter(Boolean);
                 if(files.length===0){showFiles();return;}
-                setConverting(true,'이미지를 WebP로 압축하는 중입니다...');
+                setConverting(true,'이미지를 준비하는 중입니다...');
                 try{
                     var converted=[];
                     for(var i=0;i<files.length;i++){
-                        setConverting(true,'이미지를 WebP로 압축하는 중입니다... ('+(i+1)+'/'+files.length+')');
+                        setConverting(true,'이미지를 준비하는 중입니다... ('+(i+1)+'/'+files.length+')');
                         converted.push(await toWebpFile(files[i]));
                     }
                     setInputFiles(converted);
                     showFiles();
-                    var saved=files.reduce(function(sum,f,idx){return sum+Math.max(0,f.size-(converted[idx]?converted[idx].size:f.size));},0);
-                    setStatus('WebP 변환 완료' + (saved>0 ? ' · 약 '+formatBytes(saved)+' 절감' : ''), false);
+                    setStatus('이미지 업로드 준비 완료', false);
                 }catch(err){
-                    setStatus('WebP 변환에 실패해 원본 이미지로 업로드합니다.', false);
+                    setStatus('이미지를 준비하지 못해 원본 파일로 업로드합니다.', false);
                     setInputFiles(files);
                     showFiles();
                 }finally{
@@ -213,17 +189,23 @@
 
         <div class="field">
             <label for="priceText">가격 정보</label>
-            <input id="priceText" type="text" th:field="*{priceText}" placeholder="예: 월 19,000원, 1회 9,900원">
+            <input id="priceText" type="text" th:field="*{priceText}" placeholder="예: 12,500원 / 2kg">
+        </div>
+
+        <div class="field">
+            <label for="shippingPolicyText">배송비 정책</label>
+            <textarea id="shippingPolicyText" rows="3" th:field="*{shippingPolicyText}" placeholder="예: 완전 무료배송 / 15,000원 이상 구매 시 무료배송 / 쿠팡와우 멤버십 가입 시 무료배송 / 배송비 3,000원"></textarea>
+            <p class="field-error" th:errors="*{shippingPolicyText}"></p>
         </div>
 
         <div class="field">
             <label for="targetCustomer">주요 타겟 고객</label>
-            <textarea id="targetCustomer" rows="4" th:field="*{targetCustomer}" placeholder="예: 초기 창업자, 스마트스토어 셀러, 공모전 참가자"></textarea>
+            <textarea id="targetCustomer" rows="4" th:field="*{targetCustomer}" placeholder="예: 냉동 식품을 온라인으로 구매하는 1~2인 가구"></textarea>
         </div>
 
         <div class="field">
             <label for="mainQuestion">현재 가장 궁금한 점</label>
-            <textarea id="mainQuestion" rows="4" th:field="*{mainQuestion}" placeholder="예: 가격이 부담스럽게 느껴질지, 문구가 신뢰를 줄지 궁금합니다."></textarea>
+            <textarea id="mainQuestion" rows="4" th:field="*{mainQuestion}" placeholder="예: 가격 경쟁력과 원산지 신뢰도가 구매에 어떤 영향을 줄지 궁금합니다."></textarea>
         </div>
 
         <div class="field">
@@ -241,7 +223,7 @@
         </label>
         <p class="field-error" th:errors="*{privacyAgreement}"></p>
 
-        <button class="button primary full" type="submit">신청 완료하기</button>
+        <button class="button primary full" type="submit" data-analytics-event="report_order_submit_clicked" data-analytics-category="order">신청 완료하기</button>
     </form>
 </main>
 </body>

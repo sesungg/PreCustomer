@@ -112,6 +112,7 @@ public class PipelineSaveService {
         String pageUrl = nonBlank(str(order.get("page_url")), "manual://report-order/" + orderId);
         String projectName = str(order.get("project_name"));
         String priceText = str(order.get("price_text"));
+        String shippingPolicyText = str(order.get("shipping_policy_text"));
         List<String> uploadedImages = normalizeImagePaths(order, imagePaths);
         List<Map<String, Object>> importantImages = uploadedImages.stream()
                 .map(path -> {
@@ -128,6 +129,7 @@ public class PipelineSaveService {
                 str(order.get("one_line_description")) != null ? "한 줄 설명: " + str(order.get("one_line_description")) : null,
                 str(order.get("detail_description")) != null ? "상세 설명: " + str(order.get("detail_description")) : null,
                 priceText != null ? "가격: " + priceText : null,
+                shippingPolicyText != null ? "배송비 정책: " + shippingPolicyText : null,
                 str(order.get("target_customer")) != null ? "타겟 고객: " + str(order.get("target_customer")) : null,
                 str(order.get("main_question")) != null ? "핵심 질문: " + str(order.get("main_question")) : null,
                 "업로드 캡처 이미지 수: " + uploadedImages.size(),

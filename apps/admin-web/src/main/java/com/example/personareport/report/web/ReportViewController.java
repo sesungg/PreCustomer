@@ -247,7 +247,8 @@ public class ReportViewController {
                 : "";
         String imageText = concatImageText(imageAnalyses);
         String orderText = joinText(order.get("project_name"), order.get("one_line_description"),
-                order.get("detail_description"), order.get("price_text"));
+                order.get("detail_description"), order.get("price_text"), order.get("shipping_policy_text"));
+        String shippingPolicyText = str(order.get("shipping_policy_text"));
 
         Map<String, Object> url = new LinkedHashMap<>();
         url.put("statusLabel", snapshot.isEmpty()
@@ -288,16 +289,39 @@ public class ReportViewController {
                 findStorageText(imageText), "이미지 분석",
                 findStorageText(orderText), "주문 입력");
 
-        String reviewCount = captured ? firstNonBlank(
+        String imageReviewCount = firstNonBlank(
+                findFirst(imageText, "(?:리뷰\\s*수|리뷰|후기|상품평)\\s*[:(]?\\s*([0-9,]+)\\s*(?:개|건|\\))?"),
+                findFirst(imageText, "([0-9,]+)\\s*(?:개|건)의?\\s*(?:리뷰|후기|상품평)"));
+        String imageRatingScore = findFirst(imageText, "(?:평점|별점)\\s*[:]?\\s*([0-9]+(?:\\.[0-9]+)?)");
+        EvidenceValue reviewCount = captured ? firstEvidence(
                 str(rawMeta.get("reviewCount")),
-                findFirst(urlText, "(?:리뷰|후기)\\s*([0-9,]+)\\s*(?:개|건)?"),
-                findFirst(urlText, "([0-9,]+)\\s*(?:개|건)의?\\s*(?:리뷰|후기)")) : "";
-        String ratingScore = captured ? firstNonBlank(
+                "URL 추출",
+                findFirst(urlText, "(?:리뷰|후기|상품평)\\s*([0-9,]+)\\s*(?:개|건)?"),
+                "URL 추출",
+                imageReviewCount,
+                "이미지 분석") : firstEvidence(
+                imageReviewCount,
+                "이미지 분석",
+                findFirst(orderText, "(?:리뷰|후기|상품평)\\s*([0-9,]+)\\s*(?:개|건)?"),
+                "주문 입력",
+                "",
+                "");
+        EvidenceValue ratingScore = captured ? firstEvidence(
                 str(rawMeta.get("ratingScore")),
+                "URL 추출",
                 str(rawMeta.get("satisfactionScore")),
-                findFirst(urlText, "(?:평점|별점)\\s*([0-9]+(?:\\.[0-9]+)?)")) : "";
+                "URL 추출",
+                firstNonBlank(findFirst(urlText, "(?:평점|별점)\\s*([0-9]+(?:\\.[0-9]+)?)"), imageRatingScore),
+                imageRatingScore.isBlank() ? "URL 추출" : "이미지 분석") : firstEvidence(
+                imageRatingScore,
+                "이미지 분석",
+                findFirst(orderText, "(?:평점|별점)\\s*([0-9]+(?:\\.[0-9]+)?)"),
+                "주문 입력",
+                "",
+                "");
 
         Map<String, Object> shipping = buildShippingEvidence(rawMeta, captured ? urlText : imageText,
+                shippingPolicyText,
                 displayPrice, weightGrams);
 
         Map<String, Object> product = new LinkedHashMap<>();
@@ -307,8 +331,8 @@ public class ReportViewController {
                 displayPrice > 0 && weightGrams > 0 ? priceSource + " + " + weight.source() : "계산 불가"));
         product.put("origin", valueWithSource(valueOrUnknown(origin.value()), valueOrUnknown(origin.source())));
         product.put("storage", valueWithSource(valueOrUnknown(storage.value()), valueOrUnknown(storage.source())));
-        product.put("reviewCount", valueWithSource(valueOrUnknown(reviewCount), captured ? "URL 추출" : "미확인"));
-        product.put("ratingScore", valueWithSource(valueOrUnknown(ratingScore), captured ? "URL 추출" : "미확인"));
+        product.put("reviewCount", valueWithSource(valueOrUnknown(reviewCount.value()), valueOrUnknown(reviewCount.source())));
+        product.put("ratingScore", valueWithSource(valueOrUnknown(ratingScore.value()), valueOrUnknown(ratingScore.source())));
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("url", url);
@@ -317,11 +341,12 @@ public class ReportViewController {
         result.put("shopping", buildShoppingSummary(shoppingEvidence, shoppingProducts));
         result.put("image", buildImageSummary(imageAnalyses, imageText));
         result.put("sourcePriority", List.of(
-                "1순위: URL에서 직접 추출한 객관 데이터",
-                "2순위: 이미지 OCR/시각 분석으로 확인된 데이터",
-                "3순위: 네이버 쇼핑 비교 데이터",
-                "4순위: LLM 추론 데이터"));
-        result.put("scoreRule", "가격 경쟁력은 원산지 신뢰도와 분리해 판단합니다. 가격은 배송비 포함 실구매가를 우선하고, 배송비가 미확인인 경우 표시가 기준과 불확실성을 함께 노출합니다.");
+                "1순위: 사용자가 직접 입력한 배송비 정책",
+                "2순위: 이미지 OCR/시각 분석으로 확인된 상세페이지 정보",
+                "3순위: URL에서 직접 추출한 객관 데이터",
+                "4순위: 네이버 쇼핑 비교 데이터",
+                "5순위: LLM 추론 데이터"));
+        result.put("scoreRule", "가격 경쟁력은 원산지 신뢰도와 분리해 판단합니다. 가격은 사용자 입력 배송비 정책을 반영한 실구매가를 우선하고, 조건부 배송이면 조건과 불확실성을 함께 노출합니다.");
         return result;
     }
 
@@ -369,22 +394,37 @@ public class ReportViewController {
 
     private Map<String, Object> buildShippingEvidence(Map<String, Object> rawMeta,
                                                       String text,
+                                                      String shippingPolicyText,
                                                       long displayPrice,
                                                       long weightGrams) {
+        boolean hasManualShipping = !str(shippingPolicyText).isBlank();
+        String sourceText = hasManualShipping ? shippingPolicyText : text;
         long metaShipping = firstPositive(
                 parseMoney(rawMeta.get("product_shipping_amount")),
                 parseMoney(rawMeta.get("shippingAmount")),
                 parseMoney(rawMeta.get("shippingFee")),
                 parseMoney(rawMeta.get("deliveryFee")));
-        long textShipping = parseMoney(findFirst(text, "(?:배송비|운송비)\\s*([0-9,]+)\\s*원"));
-        long shippingFee = firstPositive(metaShipping, textShipping);
+        long textShipping = parseMoney(findFirst(sourceText, "(?:배송비|운송비)\\s*([0-9,.]+\\s*(?:만\\s*)?원?)"));
+        long shippingFee = hasManualShipping ? textShipping : firstPositive(metaShipping, textShipping);
         long threshold = firstPositive(
-                parseMoney(rawMeta.get("conditionalFreeShippingMinAmount")),
-                parseMoney(findFirst(text, "([0-9,]+)\\s*원\\s*이상\\s*(?:구매\\s*)?무료배송")));
+                hasManualShipping ? 0 : parseMoney(rawMeta.get("conditionalFreeShippingMinAmount")),
+                parseMoney(findFirst(sourceText, "([0-9,.]+\\s*(?:만\\s*)?원?)\\s*이상\\s*(?:구매\\s*)?(?:시\\s*)?무료배송")));
 
         String rawType = str(rawMeta.get("deliveryType")).toLowerCase();
         String typeCode = "";
-        if (rawType.contains("free") || text.contains("무료배송")) typeCode = "FREE";
+        boolean mentionsFreeShipping = sourceText.contains("무료배송");
+        boolean conditionLike = threshold > 0
+                || sourceText.contains("이상")
+                || sourceText.contains("조건")
+                || sourceText.contains("멤버십")
+                || sourceText.toLowerCase().contains("membership")
+                || sourceText.contains("가입")
+                || sourceText.contains("와우");
+        boolean explicitCompleteFree = sourceText.contains("완전 무료배송")
+                || sourceText.contains("전 상품 무료배송")
+                || sourceText.equals("무료배송");
+        if (!hasManualShipping && rawType.contains("free")) typeCode = "FREE";
+        if (mentionsFreeShipping) typeCode = conditionLike && !explicitCompleteFree ? "CONDITIONAL_FREE" : "FREE";
         if (threshold > 0) typeCode = "CONDITIONAL_FREE";
         if (shippingFee > 0 && typeCode.isBlank()) typeCode = "PAID";
 
@@ -419,10 +459,15 @@ public class ReportViewController {
         shipping.put("thresholdText", threshold > 0 ? formatWon(threshold) + " 이상 구매 시" : "미확인");
         shipping.put("actualPriceText", actualPrice > 0 ? formatWon(actualPrice) : "계산 불가");
         shipping.put("actualUnitPriceText", actualPrice > 0 ? formatUnitPrice(actualPrice, weightGrams) : "계산 불가");
-        shipping.put("source", !"미확인".equals(shipping.get("typeText")) ? "URL/이미지 추출" : "미확인");
+        shipping.put("policyText", hasManualShipping ? shippingPolicyText : "미입력");
+        shipping.put("source", hasManualShipping
+                ? "사용자 직접 입력"
+                : !"미확인".equals(shipping.get("typeText")) ? "URL/이미지 추출" : "미확인");
         shipping.put("calculationSource", actualSource);
         shipping.put("note", actualPrice > 0
                 ? "가격 점수에는 배송비 포함 실구매가 기준을 우선 적용해야 합니다."
+                : hasManualShipping && "CONDITIONAL_FREE".equals(typeCode)
+                ? "조건부 배송 정책이라 조건 충족 여부를 함께 보아야 합니다."
                 : "배송비가 확인되지 않아 실구매가 기준 가격 경쟁력을 확정할 수 없습니다.");
         return shipping;
     }
@@ -582,7 +627,22 @@ public class ReportViewController {
     }
 
     private long parseMoney(Object value) {
-        String digits = str(value).replaceAll("[^0-9]", "");
+        String text = str(value).replace(",", "");
+        Matcher manWon = Pattern.compile("([0-9]+(?:\\.[0-9]+)?)\\s*만\\s*원").matcher(text);
+        if (manWon.find()) {
+            return BigDecimal.valueOf(Double.parseDouble(manWon.group(1)))
+                    .multiply(BigDecimal.valueOf(10000))
+                    .setScale(0, RoundingMode.HALF_UP)
+                    .longValue();
+        }
+        Matcher cheonWon = Pattern.compile("([0-9]+(?:\\.[0-9]+)?)\\s*천\\s*원").matcher(text);
+        if (cheonWon.find()) {
+            return BigDecimal.valueOf(Double.parseDouble(cheonWon.group(1)))
+                    .multiply(BigDecimal.valueOf(1000))
+                    .setScale(0, RoundingMode.HALF_UP)
+                    .longValue();
+        }
+        String digits = text.replaceAll("[^0-9]", "");
         if (digits.isBlank()) return 0;
         try {
             return Long.parseLong(digits);

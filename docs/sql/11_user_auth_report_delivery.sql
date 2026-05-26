@@ -8,9 +8,23 @@ CREATE TABLE IF NOT EXISTS user_account (
     password_hash VARCHAR(255) NOT NULL,
     role VARCHAR(30) NOT NULL DEFAULT 'USER',
     enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    terms_accepted BOOLEAN NOT NULL DEFAULT FALSE,
+    privacy_accepted BOOLEAN NOT NULL DEFAULT FALSE,
+    marketing_accepted BOOLEAN NOT NULL DEFAULT FALSE,
+    terms_accepted_at TIMESTAMP,
+    privacy_accepted_at TIMESTAMP,
+    marketing_accepted_at TIMESTAMP,
     created_at TIMESTAMP,
     updated_at TIMESTAMP
 );
+
+ALTER TABLE user_account
+    ADD COLUMN IF NOT EXISTS terms_accepted BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS privacy_accepted BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS marketing_accepted BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMP,
+    ADD COLUMN IF NOT EXISTS privacy_accepted_at TIMESTAMP,
+    ADD COLUMN IF NOT EXISTS marketing_accepted_at TIMESTAMP;
 
 CREATE TABLE IF NOT EXISTS report_delivery_request (
     id BIGSERIAL PRIMARY KEY,

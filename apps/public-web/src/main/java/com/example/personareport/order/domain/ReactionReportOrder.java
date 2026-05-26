@@ -46,6 +46,9 @@ public class ReactionReportOrder extends BaseTimeEntity {
     private String priceText;
 
     @Column(columnDefinition = "TEXT")
+    private String shippingPolicyText;
+
+    @Column(columnDefinition = "TEXT")
     private String targetCustomer;
 
     @Column(columnDefinition = "TEXT")
@@ -73,6 +76,7 @@ public class ReactionReportOrder extends BaseTimeEntity {
             String detailDescription,
             String pageUrl,
             String priceText,
+            String shippingPolicyText,
             String targetCustomer,
             String mainQuestion,
             ReportPerspective reportPerspective,
@@ -85,6 +89,7 @@ public class ReactionReportOrder extends BaseTimeEntity {
         this.detailDescription = detailDescription;
         this.pageUrl = pageUrl;
         this.priceText = priceText;
+        this.shippingPolicyText = shippingPolicyText;
         this.targetCustomer = targetCustomer;
         this.mainQuestion = mainQuestion;
         this.reportPerspective = reportPerspective;
@@ -100,6 +105,7 @@ public class ReactionReportOrder extends BaseTimeEntity {
             String detailDescription,
             String pageUrl,
             String priceText,
+            String shippingPolicyText,
             String targetCustomer,
             String mainQuestion,
             ReportPerspective reportPerspective,
@@ -113,6 +119,7 @@ public class ReactionReportOrder extends BaseTimeEntity {
                 detailDescription,
                 pageUrl,
                 priceText,
+                shippingPolicyText,
                 targetCustomer,
                 mainQuestion,
                 reportPerspective,

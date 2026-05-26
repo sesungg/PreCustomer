@@ -22,6 +22,16 @@ public class ShoppingSearchService {
     private static final List<String> AD_TOKENS = List.of(
             "무료배송", "특가", "정품", "추천", "인기", "행사", "당일발송", "최저가", "한정", "공식", "국내배송"
     );
+    private static final Set<String> DEVICE_CONTEXT_TOKENS = Set.of("아이폰", "갤럭시", "스마트폰");
+    private static final Set<String> MODEL_CONTEXT_TOKENS = Set.of("pd", "gan", "ultra", "plus", "new");
+    private static final List<String> CATEGORY_HINTS = List.of(
+            "충전", "케이블", "c타입", "손풍기", "선풍기", "반팔티", "티셔츠", "크루넥", "셔츠", "조명", "스탠드", "램프",
+            "샴푸", "닭", "정육", "삼겹살", "단백질", "쉐이크", "로션", "사료", "산양유",
+            "트롤리", "수납", "정리함", "고속", "세트", "강아지", "고양이", "베이비", "유아", "냉장", "냉동"
+    );
+    private static final Map<String, List<String>> BRAND_ALIASES = Map.of(
+            "editor", List.of("에디터")
+    );
 
     private final NaverShoppingFeignClient naverFeign;
     private final NaverShoppingProperties props;
@@ -38,6 +48,60 @@ public class ShoppingSearchService {
     public Map<String, Object> executeReportSearch(Long reportId, String query, String baseProductName, Integer basePrice,
                                                    String cat1, String cat2, String cat3, String cat4, boolean useVariants) {
         return executeSearch(reportId, query, baseProductName, basePrice, cat1, cat2, cat3, cat4, useVariants);
+    }
+
+    public static String buildCompetitorQuery(String productName, String detailDescription, String fallbackCategory) {
+        List<String> tokens = queryTokens(productName);
+        if (tokens.isEmpty()) {
+            return firstNonBlank(fallbackCategory, extractCategoryPhrase(detailDescription), "검색");
+        }
+
+        List<String> kept = new ArrayList<>();
+        for (int i = 0; i < tokens.size(); i++) {
+            String token = tokens.get(i);
+            String lower = token.toLowerCase(Locale.ROOT);
+            if (i == 0 && tokens.size() > 2 && isLikelyBrandToken(token)) continue;
+            if (MODEL_CONTEXT_TOKENS.contains(lower) || DEVICE_CONTEXT_TOKENS.contains(token)) continue;
+            if (lower.matches("\\d+\\s*w") || lower.matches("[a-z]+\\d+[a-z0-9-]*")) continue;
+            kept.add(token);
+        }
+
+        String query = compactQuery(String.join(" ", kept));
+        if (queryTokens(query).size() < 2) {
+            query = firstNonBlank(fallbackCategory, extractCategoryPhrase(detailDescription), compactQuery(productName));
+        }
+        return query.isBlank() ? "검색" : query;
+    }
+
+    public static boolean needsAiCompetitorQuery(String productName, String query) {
+        List<String> tokens = queryTokens(query);
+        Set<String> selfTokens = new HashSet<>(inferSelfBrandTokens(productName));
+        if (tokens.size() < 2) {
+            return tokens.isEmpty()
+                    || selfTokens.contains(tokens.get(0).toLowerCase(Locale.ROOT))
+                    || CATEGORY_HINTS.stream().noneMatch(tokens.get(0)::contains);
+        }
+        String normalizedQuery = compactQuery(query).toLowerCase(Locale.ROOT);
+        String normalizedProduct = compactQuery(productName).toLowerCase(Locale.ROOT);
+        if (!normalizedProduct.isBlank() && normalizedQuery.equals(normalizedProduct)) {
+            return true;
+        }
+
+        for (String token : tokens) {
+            String lower = token.toLowerCase(Locale.ROOT);
+            if (selfTokens.contains(lower)
+                    || MODEL_CONTEXT_TOKENS.contains(lower)
+                    || DEVICE_CONTEXT_TOKENS.contains(token)
+                    || lower.matches("\\d+\\s*w")
+                    || lower.matches("[a-z]+\\d+[a-z0-9-]*")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static String cleanCompetitorQueryCandidate(String query) {
+        return compactQuery(query);
     }
 
     private Map<String, Object> executeSearch(Long reportId, String query, String baseProductName, Integer basePrice,
@@ -108,6 +172,11 @@ public class ShoppingSearchService {
 
         // 4. 중복 제거
         int deduped = deduplicate(groupId);
+        int selfFiltered = removeSelfBrandProducts(groupId, baseProductName);
+        if (selfFiltered > 0) {
+            log.info("네이버 쇼핑 자기 브랜드/동일 상품 후보 제외 searchGroupId={}, filtered={}, baseProduct={}",
+                    groupId, selfFiltered, baseProductName);
+        }
 
         // 5. 후보 점수 계산
         int candidates = computeCandidates(groupId, baseProductName, basePrice, cat1, cat2, cat3, cat4);
@@ -279,6 +348,85 @@ public class ShoppingSearchService {
             if (!variants.contains(shortQ)) variants.add(shortQ);
         }
         return variants.stream().distinct().limit(5).toList();
+    }
+
+    private int removeSelfBrandProducts(Long groupId, String baseProductName) {
+        List<String> selfTokens = inferSelfBrandTokens(baseProductName);
+        int removed = 0;
+        for (String token : selfTokens) {
+            String like = "%" + token.toLowerCase(Locale.ROOT) + "%";
+            removed += jdbc.update("""
+                    DELETE FROM shopping_product_snapshot
+                    WHERE search_group_id = ?
+                      AND (
+                        lower(coalesce(title_clean, '')) LIKE ?
+                        OR lower(coalesce(brand_raw, '')) LIKE ?
+                        OR lower(coalesce(maker_raw, '')) LIKE ?
+                      )
+                    """, groupId, like, like, like);
+        }
+        return removed;
+    }
+
+    private static List<String> inferSelfBrandTokens(String productName) {
+        List<String> tokens = queryTokens(productName);
+        if (tokens.size() < 2) return List.of();
+        String first = tokens.get(0);
+        if (!isLikelyBrandToken(first)) return List.of();
+
+        List<String> result = new ArrayList<>();
+        result.add(first);
+        String lower = first.toLowerCase(Locale.ROOT);
+        result.add(lower);
+        result.addAll(BRAND_ALIASES.getOrDefault(lower, List.of()));
+        return result.stream()
+                .map(value -> value.toLowerCase(Locale.ROOT).trim())
+                .filter(value -> value.length() >= 2)
+                .distinct()
+                .toList();
+    }
+
+    private static boolean isLikelyBrandToken(String token) {
+        String value = token == null ? "" : token.trim();
+        if (value.isBlank()) return false;
+        if (CATEGORY_HINTS.stream().anyMatch(value::contains)) return false;
+        if (value.matches("[A-Za-z][A-Za-z0-9-]*")) return true;
+        return value.length() <= 6;
+    }
+
+    private static List<String> queryTokens(String text) {
+        String normalized = compactQuery(text);
+        if (normalized.isBlank()) return List.of();
+        return Arrays.stream(normalized.split("\\s+"))
+                .map(String::trim)
+                .filter(token -> !token.isBlank())
+                .toList();
+    }
+
+    private static String compactQuery(String text) {
+        if (text == null) return "";
+        return text
+                .replace("+", " ")
+                .replaceAll("[^0-9A-Za-z가-힣]+", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+    }
+
+    private static String extractCategoryPhrase(String text) {
+        List<String> tokens = queryTokens(text);
+        List<String> matches = tokens.stream()
+                .filter(token -> CATEGORY_HINTS.stream().anyMatch(token::contains))
+                .limit(6)
+                .toList();
+        return String.join(" ", matches);
+    }
+
+    private static String firstNonBlank(String... values) {
+        if (values == null) return "";
+        for (String value : values) {
+            if (value != null && !value.isBlank()) return value.trim();
+        }
+        return "";
     }
 
     private String cleanTitle(String raw) {

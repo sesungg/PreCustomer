@@ -2,7 +2,6 @@ package com.example.personareport.report.delivery.service;
 
 import com.example.personareport.report.delivery.domain.ReportDeliveryRequest;
 import com.example.personareport.report.delivery.repository.ReportDeliveryRequestRepository;
-import com.example.personareport.user.domain.UserAccount;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -21,14 +20,6 @@ public class ReportDeliveryService {
         ReportDeliveryRequest request = repository.findByReportOrderId(orderId)
                 .orElseGet(() -> ReportDeliveryRequest.createEmailOnly(orderId, email));
         request.updateEmailOnly(email);
-        return repository.save(request);
-    }
-
-    @Transactional
-    public ReportDeliveryRequest saveAccountDelivery(Long orderId, UserAccount account) {
-        ReportDeliveryRequest request = repository.findByReportOrderId(orderId)
-                .orElseGet(() -> ReportDeliveryRequest.createEmailOnly(orderId, account.getEmail()));
-        request.updateAccount(account.getId(), account.getEmail());
         return repository.save(request);
     }
 

@@ -1,6 +1,7 @@
 package com.example.personareport.report.service;
 
 import com.example.personareport.modules.shopping.service.ShoppingSearchService;
+import com.example.personareport.modules.shopping.service.ShoppingQueryExtractionService;
 import com.example.personareport.order.service.OrderService;
 import com.example.personareport.report.domain.PipelineProgress;
 import com.example.personareport.report.delivery.service.ReportDeliveryService;
@@ -38,6 +39,7 @@ public class ReportPipelineService {
     private final PipelineSaveService saveService;
     private final ReportJobService jobService;
     private final OrderService orderService;
+    private final ShoppingQueryExtractionService shoppingQueryExtractionService;
     private final ShoppingSearchService shoppingService;
     private final ReportDeliveryService reportDeliveryService;
 
@@ -173,7 +175,9 @@ public class ReportPipelineService {
                     () -> {
                         var order = orderService.getOrder(orderId);
                         Integer basePrice = parsePrice(order.getPriceText());
-                        shoppingService.executeReportSearch(orderId, order.getProjectName(), order.getProjectName(),
+                        String competitorQuery = shoppingQueryExtractionService.buildCompetitorQuery(
+                                order.getProjectName(), order.getDetailDescription(), null);
+                        shoppingService.executeReportSearch(orderId, competitorQuery, order.getProjectName(),
                                 basePrice, null, null, null, null, true);
                     }
             ));
