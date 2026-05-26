@@ -1,0 +1,12 @@
+<th:block xmlns:th="http://www.thymeleaf.org" th:fragment="head">
+    <meta name="_csrf" th:if="${_csrf != null}" th:content="${_csrf.token}">
+    <meta name="_csrf_header" th:if="${_csrf != null}" th:content="${_csrf.headerName}">
+    <script async th:if="${ga4Enabled}" th:src="'https://www.googletagmanager.com/gtag/js?id=' + ${ga4MeasurementId}"></script>
+    <script th:if="${ga4Enabled}" th:inline="javascript">
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', /*[[${ga4MeasurementId}]]*/ '', {'send_page_view': false});
+    </script>
+    <script th:if="${eventLogEnabled}" th:src="@{/js/analytics.js}" defer></script>
+</th:block>

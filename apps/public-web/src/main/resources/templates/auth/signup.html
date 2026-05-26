@@ -5,10 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>회원가입</title>
     <link rel="stylesheet" th:href="@{/css/app.css}">
+    <th:block th:replace="~{fragments/analytics :: head}"></th:block>
 </head>
 <body>
 <header class="site-header">
-    <a class="brand" href="/">CustomerPreview</a>
+    <a class="brand" href="/">PreCustomerReport</a>
     <a class="header-link" href="/login">로그인</a>
 </header>
 
@@ -17,7 +18,9 @@
         <p class="eyebrow">회원가입</p>
         <h1>리포트를 받을 계정을 만들기</h1>
     </div>
-    <form class="form auth-form" th:action="@{/signup}" th:object="${signupRequest}" method="post">
+    <form class="form auth-form" th:action="@{/signup}" th:object="${signupRequest}" method="post"
+          data-analytics-event="signup_form_submitted" data-analytics-category="auth"
+          th:attr="data-analytics-report-order-id=${returnOrderId}">
         <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
         <input type="hidden" th:field="*{returnOrderId}">
         <div class="field">
@@ -40,6 +43,20 @@
             <input id="passwordConfirm" type="password" th:field="*{passwordConfirm}" autocomplete="new-password">
             <p class="field-error" th:errors="*{passwordConfirmed}"></p>
         </div>
+        <label class="checkbox">
+            <input type="checkbox" th:field="*{termsAccepted}">
+            <span>[필수] 서비스 이용약관에 동의합니다.</span>
+        </label>
+        <p class="field-error" th:errors="*{termsAccepted}"></p>
+        <label class="checkbox">
+            <input type="checkbox" th:field="*{privacyAccepted}">
+            <span>[필수] 개인정보 수집 및 이용에 동의합니다.</span>
+        </label>
+        <p class="field-error" th:errors="*{privacyAccepted}"></p>
+        <label class="checkbox">
+            <input type="checkbox" th:field="*{marketingAccepted}">
+            <span>[선택] 리포트 활용 팁, 기능 업데이트, 이벤트 안내를 이메일로 받겠습니다.</span>
+        </label>
         <button class="button primary full" type="submit">가입하고 리포트 받기</button>
     </form>
 </main>

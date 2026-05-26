@@ -1,5 +1,6 @@
 package com.example.personareport.account.web;
 
+import com.example.personareport.analytics.service.AnalyticsEventLogService;
 import com.example.personareport.common.exception.ResourceNotFoundException;
 import com.example.personareport.order.domain.OrderStatus;
 import com.example.personareport.order.domain.ReactionReportOrder;
@@ -7,6 +8,7 @@ import com.example.personareport.order.service.OrderService;
 import com.example.personareport.report.service.ReportDataService;
 import com.example.personareport.user.domain.UserAccount;
 import com.example.personareport.user.service.UserAccountService;
+import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -33,6 +35,7 @@ public class AccountReportController {
     private final OrderService orderService;
     private final ReportDataService reportDataService;
     private final UserAccountService userAccountService;
+    private final AnalyticsEventLogService analyticsEventLogService;
 
     @GetMapping
     public String list(Model model, Authentication authentication) {
@@ -48,7 +51,10 @@ public class AccountReportController {
     }
 
     @GetMapping("/{orderId}")
-    public String detail(@PathVariable Long orderId, Model model, Authentication authentication) {
+    public String detail(@PathVariable Long orderId,
+                         Model model,
+                         Authentication authentication,
+                         HttpServletRequest request) {
         UserAccount account = requireUser(authentication);
         ReactionReportOrder order = orderService.getOrder(orderId);
         if (!owns(order, account)) {
@@ -58,6 +64,14 @@ public class AccountReportController {
         var reports = reportDataService.findReportByOrderId(orderId);
         boolean reportReady = !reports.isEmpty();
         Map<String, Object> report = reportReady ? reports.get(0) : Map.of();
+        analyticsEventLogService.recordServerEvent(
+                reportReady ? "final_report_viewed" : "report_progress_viewed",
+                "report",
+                orderId,
+                account.getId(),
+                Map.of("reportReady", reportReady),
+                request
+        );
 
         model.addAttribute("loggedInUser", account);
         model.addAttribute("order", order);

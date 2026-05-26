@@ -5,14 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>가상고객 100명 반응 리포트</title>
     <link rel="stylesheet" th:href="@{/css/app.css}">
+    <th:block th:replace="~{fragments/analytics :: head}"></th:block>
 </head>
 <body>
 <header class="site-header">
-    <a class="brand" href="/">CustomerPreview</a>
+    <a class="brand" href="/">PreCustomerReport</a>
     <nav class="header-nav">
-        <a class="header-link" href="/orders/new">리포트 신청하기</a>
-        <a class="header-link" th:if="${loggedInUser == null}" href="/login">로그인</a>
-        <a class="header-link" th:if="${loggedInUser != null}" href="/account/reports">내 리포트</a>
+        <a class="header-link" href="/orders/new" data-analytics-event="report_order_start_clicked" data-analytics-category="navigation">리포트 신청하기</a>
+        <a class="header-link" th:if="${loggedInUser == null}" href="/login" data-analytics-event="login_clicked" data-analytics-category="navigation">로그인</a>
+        <a class="header-link" th:if="${loggedInUser != null}" href="/account/reports" data-analytics-event="my_reports_clicked" data-analytics-category="navigation">내 리포트</a>
         <form th:if="${loggedInUser != null}" th:action="@{/logout}" method="post" class="inline-form">
             <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
             <button class="link-button" type="submit">로그아웃</button>
@@ -23,12 +24,12 @@
 <main>
     <section class="hero">
         <div class="hero-copy">
-            <p class="eyebrow">미리고객 베타 리포트</p>
+            <p class="eyebrow">PreCustomerReport 베타 리포트</p>
             <h1>가상고객 100명 반응 리포트</h1>
             <p class="lead">내 아이디어를 실제 고객에게 보여주기 전에, 한국형 가상고객 100명의 반응을 먼저 확인합니다.</p>
             <p class="sublead">창업 아이디어, 앱 소개글, 판매페이지, 상세페이지, 공모전 기획안을 입력하면 관심도, 이탈 이유, 불신 포인트, 개선 방향을 리포트로 제공합니다.</p>
             <div class="hero-actions">
-                <a class="button primary" href="/orders/new">리포트 신청하기</a>
+                <a class="button primary" href="/orders/new" data-analytics-event="report_order_start_clicked" data-analytics-category="hero_cta">리포트 신청하기</a>
                 <span class="price">한국형 가상고객 반응 리포트 9,900원</span>
             </div>
         </div>
@@ -90,12 +91,12 @@
     <section class="section notice">
         <h2>사전 반응 진단으로 활용해 주세요</h2>
         <p>본 리포트는 AI 기반 가상고객 시뮬레이션입니다. 출시 전 참고용으로 활용하며, 실제 소비자 조사나 결과 보장을 의미하지 않습니다.</p>
-        <a class="button primary" href="/orders/new">9,900원 베타 리포트 신청하기</a>
+        <a class="button primary" href="/orders/new" data-analytics-event="report_order_start_clicked" data-analytics-category="bottom_cta">9,900원 베타 리포트 신청하기</a>
     </section>
 </main>
 
 <footer class="site-footer">
-    <p>CustomerPreview. AI 기반 가상고객 시뮬레이션 리포트.</p>
+    <p>PreCustomerReport. AI 기반 가상고객 시뮬레이션 리포트.</p>
 </footer>
 </body>
 </html>

@@ -5,10 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>로그인</title>
     <link rel="stylesheet" th:href="@{/css/app.css}">
+    <th:block th:replace="~{fragments/analytics :: head}"></th:block>
 </head>
 <body>
 <header class="site-header">
-    <a class="brand" href="/">CustomerPreview</a>
+    <a class="brand" href="/">PreCustomerReport</a>
     <a class="header-link" href="/signup">회원가입</a>
 </header>
 
@@ -17,7 +18,8 @@
         <p class="eyebrow">로그인</p>
         <h1>계정으로 계속하기</h1>
     </div>
-    <form class="form auth-form" th:action="@{/login}" method="post">
+    <form class="form auth-form" th:action="@{/login}" method="post"
+          data-analytics-event="login_form_submitted" data-analytics-category="auth">
         <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
         <div class="field" th:if="${param.error}">
             <p class="field-error">이메일 또는 비밀번호를 확인해 주세요.</p>
@@ -34,7 +36,7 @@
             <input id="password" name="password" type="password" autocomplete="current-password" required>
         </div>
         <button class="button primary full" type="submit">로그인</button>
-        <a class="button secondary full" href="/signup">회원가입</a>
+        <a class="button secondary full" href="/signup" data-analytics-event="signup_clicked" data-analytics-category="auth">회원가입</a>
     </form>
 </main>
 </body>

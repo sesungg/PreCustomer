@@ -3,6 +3,7 @@ package com.example.personareport.order.service;
 import com.example.personareport.common.exception.ResourceNotFoundException;
 import com.example.personareport.order.domain.OrderStatus;
 import com.example.personareport.order.domain.ReactionReportOrder;
+import com.example.personareport.order.domain.TargetType;
 import com.example.personareport.order.dto.OrderRequest;
 import com.example.personareport.order.repository.ReactionReportOrderRepository;
 import com.example.personareport.report.service.ImageStorageService;
@@ -26,7 +27,7 @@ public class OrderService {
 
     /**
      * 주문을 생성하고 업로드된 이미지를 저장한다.
-     * 이미지 업로드 실패 시에도 주문은 정상 생성된다.
+     * 이미지 업로드 실패 시에는 주문 생성을 롤백한다.
      */
     @Transactional
     public ReactionReportOrder createOrder(OrderRequest request, List<MultipartFile> images) {
@@ -38,11 +39,12 @@ public class OrderService {
         ReactionReportOrder order = ReactionReportOrder.create(
                 request.customerEmail(),
                 request.projectName(),
-                request.targetType(),
-                request.oneLineDescription(),
-                request.detailDescription(),
-                request.pageUrl(),
+                TargetType.SMART_STORE,
+                null,
+                null,
+                null,
                 request.priceText(),
+                request.shippingPolicyText(),
                 request.targetCustomer(),
                 request.mainQuestion(),
                 request.reportPerspective(),
@@ -61,7 +63,8 @@ public class OrderService {
                     order.setImagePaths(imagePaths);
                 }
             } catch (ImageUploadException e) {
-                log.warn("이미지 업로드 실패 (주문은 생성됨): {}", e.getMessage());
+                log.warn("이미지 업로드 실패: {}", e.getMessage());
+                throw e;
             }
         }
 

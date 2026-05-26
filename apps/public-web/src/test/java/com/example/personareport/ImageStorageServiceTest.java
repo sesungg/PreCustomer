@@ -23,12 +23,12 @@ class ImageStorageServiceTest {
 
     @Test
     void storeImages_tooManyFiles_throwsException() {
-        List<org.springframework.web.multipart.MultipartFile> files = java.util.stream.IntStream.range(0, 11)
+        List<org.springframework.web.multipart.MultipartFile> files = java.util.stream.IntStream.range(0, 21)
                 .mapToObj(i -> (org.springframework.web.multipart.MultipartFile) new MockMultipartFile("img" + i, "img" + i + ".png", "image/png", new byte[100]))
                 .toList();
         assertThatThrownBy(() -> service.storeImages(1L, files))
                 .isInstanceOf(ImageUploadException.class)
-                .hasMessageContaining("최대 10장");
+                .hasMessageContaining("최대 20장");
     }
 
     @Test

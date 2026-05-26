@@ -1,5 +1,6 @@
 package com.example.personareport.user.web;
 
+import com.example.personareport.analytics.service.AnalyticsEventLogService;
 import com.example.personareport.order.service.OrderService;
 import com.example.personareport.report.delivery.service.ReportDeliveryService;
 import com.example.personareport.user.domain.UserAccount;
@@ -9,6 +10,7 @@ import com.example.personareport.user.service.UserAccountService.DuplicateEmailE
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -31,6 +33,7 @@ public class AuthController {
     private final UserAccountService userAccountService;
     private final ReportDeliveryService reportDeliveryService;
     private final OrderService orderService;
+    private final AnalyticsEventLogService analyticsEventLogService;
 
     @GetMapping("/login")
     public String login() {
@@ -40,7 +43,7 @@ public class AuthController {
     @GetMapping("/signup")
     public String signup(@RequestParam(value = "orderId", required = false) Long orderId, Model model) {
         if (!model.containsAttribute("signupRequest")) {
-            model.addAttribute("signupRequest", new SignupRequest("", "", "", "", orderId));
+            model.addAttribute("signupRequest", new SignupRequest("", "", "", "", false, false, false, orderId));
         }
         model.addAttribute("returnOrderId", orderId);
         return "auth/signup";
@@ -64,6 +67,14 @@ public class AuthController {
                 reportDeliveryService.saveAccountDelivery(signupRequest.returnOrderId(), account);
             }
             loginAfterSignup(account, request);
+            analyticsEventLogService.recordServerEvent(
+                    "signup_completed",
+                    "auth",
+                    signupRequest.returnOrderId(),
+                    account.getId(),
+                    Map.of("linkedOrder", signupRequest.returnOrderId() != null),
+                    request
+            );
             if (signupRequest.returnOrderId() != null) {
                 return "redirect:/orders/" + signupRequest.returnOrderId() + "/complete?joined=1";
             }

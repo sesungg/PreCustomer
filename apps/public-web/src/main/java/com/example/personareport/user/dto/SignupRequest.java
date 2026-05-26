@@ -3,6 +3,7 @@ package com.example.personareport.user.dto;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 public record SignupRequest(
@@ -20,6 +21,16 @@ public record SignupRequest(
 
         @NotBlank(message = "비밀번호 확인을 입력해 주세요.")
         String passwordConfirm,
+
+        @NotNull(message = "서비스 이용약관에 동의해 주세요.")
+        @AssertTrue(message = "서비스 이용약관에 동의해 주세요.")
+        Boolean termsAccepted,
+
+        @NotNull(message = "개인정보 수집 및 이용에 동의해 주세요.")
+        @AssertTrue(message = "개인정보 수집 및 이용에 동의해 주세요.")
+        Boolean privacyAccepted,
+
+        Boolean marketingAccepted,
 
         Long returnOrderId
 ) {

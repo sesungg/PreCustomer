@@ -20,7 +20,7 @@ public class ImageStorageService {
 
     private static final List<String> ALLOWED_CONTENT_TYPES = List.of("image/webp", "image/png", "image/jpeg");
     private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-    private static final int MAX_IMAGE_COUNT = 10;
+    private static final int MAX_IMAGE_COUNT = 20;
 
     private final Path uploadDir;
 
