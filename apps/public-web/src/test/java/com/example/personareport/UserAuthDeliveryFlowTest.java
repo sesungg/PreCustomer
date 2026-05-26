@@ -25,6 +25,9 @@ import org.springframework.test.web.servlet.MockMvc;
 
 @ActiveProfiles({"h2", "public-web"})
 @SpringBootTest(properties = {
+        "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.session.SessionAutoConfiguration",
+        "spring.session.store-type=none",
+        "management.health.redis.enabled=false",
         "app.persona.import-enabled=false",
         "app.persona.sample-import-enabled=false"
 })

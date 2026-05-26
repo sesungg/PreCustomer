@@ -16,7 +16,11 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
-@SpringBootTest
+@SpringBootTest(properties = {
+        "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.session.SessionAutoConfiguration",
+        "spring.session.store-type=none",
+        "management.health.redis.enabled=false"
+})
 @AutoConfigureMockMvc
 @ActiveProfiles({"h2", "public-web"})
 class OrderFormFlowTest {
