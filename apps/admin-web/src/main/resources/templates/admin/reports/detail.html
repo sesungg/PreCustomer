@@ -298,6 +298,11 @@
                         <td th:text="${evidenceSummary.shipping.source}">-</td>
                     </tr>
                     <tr>
+                        <td>사용자 입력 배송비 정책</td>
+                        <td th:text="${evidenceSummary.shipping.policyText}">-</td>
+                        <td>배송비 판단 최우선 근거</td>
+                    </tr>
+                    <tr>
                         <td>배송비 / 조건부 무료배송 기준</td>
                         <td>
                             <span th:text="${evidenceSummary.shipping.amountText}">-</span>

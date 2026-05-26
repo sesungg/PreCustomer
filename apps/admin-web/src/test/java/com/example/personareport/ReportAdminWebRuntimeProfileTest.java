@@ -3,15 +3,6 @@ package com.example.personareport;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.personareport.modules.shopping.client.NaverShoppingFeignClient;
-import com.example.personareport.modules.shopping.web.ShoppingSearchController;
-import com.example.personareport.order.web.AdminOrderController;
-import com.example.personareport.order.web.LandingController;
-import com.example.personareport.order.web.OrderController;
-import com.example.personareport.report.job.ReportJobWorker;
-import com.example.personareport.report.pipeline.DeepSeekFeignClient;
-import com.example.personareport.report.web.AdminMvController;
-import com.example.personareport.report.web.ReportPdfController;
-import com.example.personareport.report.web.ReportViewController;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -36,9 +27,6 @@ class ReportAdminWebRuntimeProfileTest {
     private ApplicationContext context;
 
     @MockBean
-    private DeepSeekFeignClient deepSeekClient;
-
-    @MockBean
     private NaverShoppingFeignClient naverFeign;
 
     @Test
@@ -46,13 +34,15 @@ class ReportAdminWebRuntimeProfileTest {
         assertThat(environment.getProperty("app.web.public-enabled", Boolean.class)).isFalse();
         assertThat(environment.getProperty("app.web.admin-enabled", Boolean.class)).isTrue();
         assertThat(environment.getProperty("app.pipeline.worker-enabled", Boolean.class)).isFalse();
-        assertThat(context.getBeanNamesForType(LandingController.class)).isEmpty();
-        assertThat(context.getBeanNamesForType(OrderController.class)).isEmpty();
-        assertThat(context.getBeanNamesForType(AdminOrderController.class)).hasSize(1);
-        assertThat(context.getBeanNamesForType(ReportViewController.class)).hasSize(1);
-        assertThat(context.getBeanNamesForType(ReportPdfController.class)).hasSize(1);
-        assertThat(context.getBeanNamesForType(AdminMvController.class)).hasSize(1);
-        assertThat(context.getBeanNamesForType(ShoppingSearchController.class)).hasSize(1);
-        assertThat(context.getBeanNamesForType(ReportJobWorker.class)).isEmpty();
+        assertThat(context.containsBeanDefinition("landingController")).isFalse();
+        assertThat(context.containsBeanDefinition("orderController")).isFalse();
+        assertThat(context.containsBeanDefinition("authController")).isFalse();
+        assertThat(context.containsBeanDefinition("adminAuthController")).isTrue();
+        assertThat(context.containsBeanDefinition("adminOrderController")).isTrue();
+        assertThat(context.containsBeanDefinition("reportViewController")).isTrue();
+        assertThat(context.containsBeanDefinition("reportPdfController")).isTrue();
+        assertThat(context.containsBeanDefinition("adminMvController")).isTrue();
+        assertThat(context.containsBeanDefinition("shoppingSearchController")).isTrue();
+        assertThat(context.containsBeanDefinition("reportJobWorker")).isFalse();
     }
 }

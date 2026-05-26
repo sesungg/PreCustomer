@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.example.personareport.gateway.config.GatewaySecurityProperties;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
+import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
+import org.springframework.mock.web.server.MockServerWebExchange;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 class AuthControllerTest {
@@ -50,6 +52,24 @@ class AuthControllerTest {
 
         assertThat(response).isNotNull();
         assertThat(response.getStatusCode().value()).isEqualTo(401);
+    }
+
+    @Test
+    void loginPageProvidesBrowserForm() {
+        GatewaySecurityProperties properties = properties("admin");
+        AuthController controller = new AuthController(
+                properties,
+                new BCryptPasswordEncoder(),
+                new JwtService(properties)
+        );
+
+        var exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/auth/login"));
+        var response = controller.loginPage(exchange).block();
+
+        assertThat(response).isNotNull();
+        assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(response.getBody()).contains("action=\"/auth/login\"");
+        assertThat(response.getBody()).contains("Admin Login");
     }
 
     private GatewaySecurityProperties properties(String password) {

@@ -9,7 +9,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.example.personareport.contracts.auth.PassportCodec;
 import com.example.personareport.modules.shopping.client.NaverShoppingFeignClient;
-import com.example.personareport.report.pipeline.DeepSeekFeignClient;
 import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -21,7 +20,7 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
-@ActiveProfiles({"h2", "web"})
+@ActiveProfiles({"h2", "admin-web"})
 @SpringBootTest(properties = {
         "app.persona.import-enabled=false",
         "app.persona.sample-import-enabled=false"
@@ -35,16 +34,13 @@ class AdminSecurityAccessTest {
     private MockMvc mockMvc;
 
     @MockBean
-    private DeepSeekFeignClient deepSeekClient;
-
-    @MockBean
     private NaverShoppingFeignClient naverFeign;
 
     @Test
     void adminPage_redirectsToLoginWhenAnonymous() throws Exception {
         mockMvc.perform(get("/admin/orders"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(header().string("Location", containsString("/login")));
+                .andExpect(header().string("Location", containsString("/admin/login")));
     }
 
     @Test
@@ -69,14 +65,8 @@ class AdminSecurityAccessTest {
     }
 
     @Test
-    void publicOrderForm_allowsAnonymous() throws Exception {
-        mockMvc.perform(get("/orders/new"))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    void loginPage_allowsAnonymous() throws Exception {
-        mockMvc.perform(get("/login"))
+    void adminLoginPage_allowsAnonymous() throws Exception {
+        mockMvc.perform(get("/admin/login"))
                 .andExpect(status().isOk());
     }
 
@@ -90,7 +80,7 @@ class AdminSecurityAccessTest {
     void unknownRoute_redirectsAnonymousToLogin() throws Exception {
         mockMvc.perform(get("/internal/unknown"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(header().string("Location", containsString("/login")));
+                .andExpect(header().string("Location", containsString("/admin/login")));
     }
 
     @Test
@@ -104,7 +94,7 @@ class AdminSecurityAccessTest {
     void uploadedFiles_requireAdminAuthentication() throws Exception {
         mockMvc.perform(get("/uploads/sample.png"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(header().string("Location", containsString("/login")));
+                .andExpect(header().string("Location", containsString("/admin/login")));
     }
 
     @Test
