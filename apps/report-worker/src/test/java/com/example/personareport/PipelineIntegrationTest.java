@@ -1,16 +1,13 @@
 package com.example.personareport;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.when;
 
 import com.example.personareport.modules.shopping.client.NaverShoppingFeignClient;
 import com.example.personareport.order.domain.OrderStatus;
 import com.example.personareport.order.domain.ReactionReportOrder;
 import com.example.personareport.order.domain.ReportPerspective;
 import com.example.personareport.order.domain.TargetType;
-import com.example.personareport.order.dto.OrderRequest;
+import com.example.personareport.order.repository.ReactionReportOrderRepository;
 import com.example.personareport.order.service.OrderService;
 import com.example.personareport.report.domain.PipelineProgress;
 import com.example.personareport.report.pipeline.DeepSeekFeignClient;
@@ -39,6 +36,9 @@ class PipelineIntegrationTest {
     private OrderService orderService;
 
     @Autowired
+    private ReactionReportOrderRepository orderRepository;
+
+    @Autowired
     private PipelineProgressService progressService;
 
     @Autowired
@@ -57,28 +57,15 @@ class PipelineIntegrationTest {
     private ReportPipelineService reportPipeline;
 
     @Test
-    void createOrder_persistsWithRequestedStatus() {
-        var request = new OrderRequest(
-                "test@example.com", "테스트 상품", TargetType.SAAS,
-                "한 줄 소개", "상세 설명입니다", "https://example.com",
-                "19,900원", "주요 타겟", "궁금한 점", ReportPerspective.GENERAL_REACTION, true
-        );
-        ReactionReportOrder order = orderService.createOrder(request, null);
-
-        assertThat(order.getId()).isNotNull();
-        assertThat(order.getStatus()).isEqualTo(OrderStatus.REQUESTED);
-        assertThat(order.getProjectName()).isEqualTo("테스트 상품");
-    }
-
-    @Test
     void orderLifecycle_allStatusTransitions() {
-        var request = new OrderRequest(
+        var order = saveOrder(
                 "lifecycle@test.com", "라이프사이클", TargetType.ETC,
-                "소개", "설명", null, "9,900원",
+                "소개", "설명", null, "9,900원", "완전 무료배송",
                 "타겟", "질문", ReportPerspective.GENERAL_REACTION, true
         );
-        var order = orderService.createOrder(request, null);
         Long id = order.getId();
+
+        assertThat(orderService.getOrder(id).getStatus()).isEqualTo(OrderStatus.REQUESTED);
 
         // REQUESTED → PAID
         orderService.markPaid(id);
@@ -95,23 +82,6 @@ class PipelineIntegrationTest {
         // COMPLETED → STOPPED (운영자가 중지 처리할 수 있음)
         orderService.markStopped(id);
         assertThat(orderService.getOrder(id).getStatus()).isEqualTo(OrderStatus.STOPPED);
-    }
-
-    @Test
-    void findOrders_filterByStatus() {
-        var r1 = new OrderRequest("a@t.com", "A", TargetType.SAAS, "d", "d", null, "p", "t", "q", ReportPerspective.GENERAL_REACTION, true);
-        var r2 = new OrderRequest("b@t.com", "B", TargetType.ETC, "d", "d", null, "p", "t", "q", ReportPerspective.GENERAL_REACTION, true);
-        orderService.createOrder(r1, null);
-        var o2 = orderService.createOrder(r2, null);
-        orderService.markPaid(o2.getId());
-
-        var all = orderService.findOrders(null);
-        var paid = orderService.findOrders(OrderStatus.PAID);
-        var requested = orderService.findOrders(OrderStatus.REQUESTED);
-
-        assertThat(all).hasSizeGreaterThanOrEqualTo(2);
-        assertThat(paid).allMatch(o -> o.getStatus() == OrderStatus.PAID);
-        assertThat(requested).allMatch(o -> o.getStatus() == OrderStatus.REQUESTED);
     }
 
     @Test
@@ -246,5 +216,33 @@ class PipelineIntegrationTest {
                 """, groupId);
 
         assertThat(queryService.hasReportShoppingAnalysis(orderId)).isTrue();
+    }
+
+    private ReactionReportOrder saveOrder(String email,
+                                          String projectName,
+                                          TargetType targetType,
+                                          String oneLineDescription,
+                                          String detailDescription,
+                                          String pageUrl,
+                                          String priceText,
+                                          String shippingPolicyText,
+                                          String targetCustomer,
+                                          String mainQuestion,
+                                          ReportPerspective reportPerspective,
+                                          boolean privacyAgreement) {
+        return orderRepository.saveAndFlush(ReactionReportOrder.create(
+                email,
+                projectName,
+                targetType,
+                oneLineDescription,
+                detailDescription,
+                pageUrl,
+                priceText,
+                shippingPolicyText,
+                targetCustomer,
+                mainQuestion,
+                reportPerspective,
+                privacyAgreement
+        ));
     }
 }

@@ -13,7 +13,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.example.personareport.modules.shopping.service.ShoppingSearchService;
+import com.example.personareport.modules.shopping.service.ShoppingQueryExtractionService;
 import com.example.personareport.order.service.OrderService;
+import com.example.personareport.order.domain.ReactionReportOrder;
+import com.example.personareport.order.domain.ReportPerspective;
+import com.example.personareport.order.domain.TargetType;
 import com.example.personareport.report.domain.PipelineProgress;
 import com.example.personareport.report.delivery.service.ReportDeliveryService;
 import com.example.personareport.report.job.ReportJobService;
@@ -48,6 +52,8 @@ class ReportPipelineServiceResumeTest {
     @Mock
     private OrderService orderService;
     @Mock
+    private ShoppingQueryExtractionService shoppingQueryExtractionService;
+    @Mock
     private ShoppingSearchService shoppingService;
     @Mock
     private ReportDeliveryService reportDeliveryService;
@@ -58,7 +64,7 @@ class ReportPipelineServiceResumeTest {
     void setUp() {
         service = new ReportPipelineService(
                 progressService, pipelineJava, queryService, saveService, jobService, orderService,
-                shoppingService, reportDeliveryService);
+                shoppingQueryExtractionService, shoppingService, reportDeliveryService);
         lenient().when(progressService.save(any(PipelineProgress.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
     }
@@ -142,5 +148,51 @@ class ReportPipelineServiceResumeTest {
         verify(pipelineJava, never()).generateTargetProfile(anyLong(), anyString());
         verify(pipelineJava, never()).generateReactions(anyLong(), anyString(), anyInt(), anyBoolean(), any());
         verify(orderService).markCompleted(orderId);
+    }
+
+    @Test
+    void runDetailPagePipeline_usesCompetitorQueryExtractorForShoppingStep() {
+        Long orderId = 14L;
+        String profileVersion = "product_target_profile_v1";
+        String responseVersion = "detail_page_reaction_v1";
+        String reportVersion = "detail_page_final_report_v1";
+        ReactionReportOrder order = ReactionReportOrder.create(
+                "test@example.com",
+                "EDITOR PD 25W 아이폰 갤럭시 고속 c타입 충전기 + 케이블 세트",
+                TargetType.DETAIL_PAGE,
+                "",
+                "가격 4,400원, 리뷰 수 535",
+                "",
+                "4,400원",
+                "배송비 3,000원",
+                "",
+                "이 상품 상세페이지를 본 고객 반응 리포트를 생성해줘.",
+                ReportPerspective.GENERAL_REACTION,
+                true);
+
+        when(progressService.findById(orderId)).thenReturn(Optional.empty());
+        when(queryService.hasPageSnapshot(orderId)).thenReturn(true);
+        when(queryService.hasReportShoppingAnalysis(orderId)).thenReturn(false, true);
+        when(orderService.getOrder(orderId)).thenReturn(order);
+        when(shoppingQueryExtractionService.buildCompetitorQuery(
+                order.getProjectName(), order.getDetailDescription(), null))
+                .thenReturn("고속 c타입 충전기 케이블 세트");
+        when(queryService.hasTargetProfile(orderId, profileVersion)).thenReturn(true);
+        when(queryService.countSelectedPersonasForLatestTargetProfile(orderId, profileVersion)).thenReturn(30);
+        when(queryService.hasCompleteReactions(orderId, responseVersion)).thenReturn(true);
+        when(queryService.hasFinalReport(orderId, reportVersion)).thenReturn(true);
+
+        service.runDetailPagePipeline(orderId, List.<Path>of());
+
+        verify(shoppingService).executeReportSearch(
+                eq(orderId),
+                eq("고속 c타입 충전기 케이블 세트"),
+                eq(order.getProjectName()),
+                eq(4400),
+                eq(null),
+                eq(null),
+                eq(null),
+                eq(null),
+                eq(true));
     }
 }

@@ -176,6 +176,8 @@ public class DeepSeekService {
             - 출력은 JSON 객체 하나만 반환한다. 마크다운 금지.
             - 아래 템플릿의 키 이름을 바꾸지 마라.
             - 없는 근거를 사실처럼 만들지 마라.
+            - order.shippingPolicyText가 있으면 가격 민감도와 구매 저항 요인 판단에 반영하되, 조건부/멤버십 무료배송을 완전 무료배송처럼 단정하지 마라.
+            - 이미지 분석 결과에 보이는 구성품, 원산지, 용량, 소재, 기능, 주의사항, 리뷰/평점 문구를 타겟 프로필과 purchaseDrivers/purchaseBarriers에 반영한다.
             - 성별/연령 가중치는 고정관념이 아니라 상품 맥락에 따른 약한 prior로만 둔다.
             - 특정 성별/연령을 완전히 배제하지 마라.
             - keyword는 보조 신호다. 키워드만으로 고객을 뽑게 만들지 마라.
@@ -255,12 +257,15 @@ public class DeepSeekService {
             - 반드시 페르소나 정보, 상품 상세페이지 정보, 그리고 Vision 모델이 직접 분석한 이미지 분석 결과를 연결해서 판단한다.
             - 없는 사실을 만들지 않는다.
             - product.sourceEvidence를 반드시 확인하고 URL, 이미지, 네이버 쇼핑, LLM 추론 출처를 섞지 않는다.
+            - product.sourceEvidence.userInput.shippingPolicyText가 있으면 배송비 판단의 최우선 근거다. 입력 문구를 그대로 해석하되, 조건부 무료배송/멤버십 무료배송은 "조건 충족 시"로 표현하고 완전 무료배송처럼 단정하지 않는다.
             - product.sourceEvidence.url.screenshotPrimary가 true이면 상세페이지 캡처 이미지가 1차 근거다. URL 본문이 아니라 imageAnalyses에서 보이는 정보만 객관 근거로 사용한다.
             - URL 크롤링 상태가 FALLBACK/FAILED/MISSING이면 리뷰나 평점이 "없다"고 단정하지 말고 "확인되지 않았다"고만 표현한다.
             - URL rawMetaJson 또는 sourceEvidence.url에 reviewCount/ratingScore가 있으면 후기/평점 근거로 최우선 반영한다.
+            - 캡처 이미지의 visibleText/imageSummary에 리뷰 수나 평점이 보이면 image 근거로 반드시 반영한다. 단, 이미지에 보이지 않는 리뷰/평점은 추론하지 않는다.
+            - image.items의 visibleClaims, visiblePrices, visibleUsageInstructions, visualPurchaseDrivers, visualPurchaseBarriers, safetyOrComplianceNotes에 보이는 핵심 문구, 구성품, 원산지, 용량, 소재, 기능, 주의사항을 상세페이지 반응에 반영한다.
             - 가격 경쟁력과 원산지/식품 안전 신뢰도는 분리한다. 수입산이라서 신뢰도는 낮아질 수 있지만, 그 이유만으로 priceAcceptanceScore를 낮추지 않는다.
             - priceAcceptanceScore는 표시 가격, 중량, 배송비 포함 실구매가, 네이버 가격 위치를 기준으로 판단한다.
-            - 배송비가 미확인인 경우 가격을 과도하게 낮게 평가하지 말고 "배송비 확인 필요"를 missingInformation 또는 concerns에 넣는다.
+            - 배송비가 미확인인 경우 가격을 과도하게 낮게 평가하지 말고 "배송비 확인 필요"를 missingInformation 또는 concerns에 넣는다. 배송비 입력값이 있으면 네이버 쇼핑 데이터로 다른 배송 조건을 덮어쓰지 않는다.
             - 네이버 쇼핑 비교는 보조 근거다. 원산지, 부위, 중량, 냉장/냉동, 배송비 조건이 다른 후보를 근거로 가격이 비싸다고 단정하지 않는다.
             - 네이버 priceAnalysis.priceLevel이 LOW이고 기준가가 중앙값보다 낮다면, 배송비가 비싸다는 명확한 근거가 없는 한 가격 경쟁력은 긍정적으로 평가한다.
             - 냉동/신선식품의 단순 변심 반품 제한은 일반적인 카테고리 조건으로 다루고 치명적 리스크처럼 과장하지 않는다.
@@ -337,13 +342,17 @@ public class DeepSeekService {
             - 과장된 광고 문구가 아니라 분석 리포트 문체로 작성한다.
             - 숫자와 비율을 적극 활용한다.
             - aggregate.sourceEvidence를 기준으로 URL 추출 데이터, 이미지 분석 데이터, 네이버 쇼핑 비교 데이터, LLM 추론을 구분한다.
+            - aggregate.sourceEvidence.userInput.shippingPolicyText가 있으면 배송비 판단의 최우선 근거로 반드시 반영한다. 조건부 무료배송, 멤버십 무료배송, 유료배송, 완전 무료배송의 차이를 유지하고 실구매가는 계산 가능할 때만 단정한다.
             - aggregate.sourceEvidence.url.screenshotPrimary가 true이면 상세페이지 전체 캡처 이미지를 1차 근거로 설명하고, URL 크롤링 실패를 리포트 실패로 취급하지 않는다.
             - 가격 요약에서는 원산지 신뢰도와 가격 경쟁력을 분리한다. 수입산 신뢰 우려는 trustSummary/riskSummary에서 다루고 priceSummary의 직접 감점 근거로 쓰지 않는다.
-            - 배송비 포함 실구매가가 확인되면 그 값을 가격 판단의 우선 근거로 쓴다. 배송비가 미확인인 경우 표시가 기준 판단과 배송비 불확실성을 함께 적는다.
+            - 배송비 포함 실구매가가 확인되면 그 값을 가격 판단의 우선 근거로 쓴다. 배송비가 조건부이거나 미확인인 경우 표시가 기준 판단과 조건/불확실성을 함께 적는다.
             - 네이버 쇼핑 비교에 배송비/리뷰/평점이 없으면 그 한계를 명시하고, 조건이 다른 비교 상품으로 가격 점수를 강하게 낮추지 않는다.
             - URL 크롤링이 실패했으면 "후기 부재"라고 쓰지 말고 "URL 리뷰/평점 확인 실패"라고 표현한다. reviewCount/ratingScore가 있으면 반드시 반영한다.
+            - 캡처 이미지에 리뷰 수나 평점이 보이면 이미지 근거로 반드시 반영한다. 보이지 않으면 "캡처 기준 미확인"으로만 쓴다.
+            - detailPageSummary와 개선안에는 image.items에서 확인되는 핵심 문구, 구성품, 원산지, 용량, 소재, 기능, 주의사항을 근거로 반영한다. 없으면 누락 정보로 분류하되 사실처럼 채우지 않는다.
             - 냉동/신선식품의 단순 변심 반품 제한은 카테고리 일반 제약으로 분류하고 과도한 단점으로 쓰지 않는다.
             - 이미지에서 보이는 정보와 URL 상세페이지에서 확인된 정보를 구분해 설명한다.
+            - reportMarkdown에는 "확인된 근거"와 "추론/개선 제안"이 섞이지 않게 작성한다. 캡처나 입력값에 없는 할인율, 리뷰 수, 평점, 구성품, 원산지, 용량, 소재, 기능, 주의사항은 사실처럼 쓰지 않는다.
             - "좋다/나쁘다"만 말하지 말고 왜 그런지 설명한다.
             - 개별 반응을 그대로 복붙하지 말고, 공통 패턴과 예외 패턴을 정리한다.
             - 상세페이지 개선안은 우선순위 HIGH/MEDIUM/LOW로 나눈다.

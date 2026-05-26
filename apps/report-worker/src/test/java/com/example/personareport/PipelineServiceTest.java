@@ -1,8 +1,17 @@
 package com.example.personareport;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
+import com.example.personareport.report.pipeline.DeepSeekService;
 import com.example.personareport.report.pipeline.PipelineJavaService;
+import com.example.personareport.report.pipeline.PipelineQueryService;
+import com.example.personareport.report.pipeline.PipelineSaveService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.lang.reflect.Method;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -118,6 +127,47 @@ class PipelineServiceTest {
         int score = 0;
         if (true) score += 20;  // title only
         assertThat(score).isEqualTo(20);
+    }
+
+    @Test
+    void groundingChecklist_distinguishesMissingDisplayPriceFromOptionPrices() throws Exception {
+        PipelineJavaService service = new PipelineJavaService(
+                new ObjectMapper(),
+                mock(DeepSeekService.class),
+                mock(PipelineQueryService.class),
+                mock(PipelineSaveService.class)
+        );
+        String detailDescription = "상품명=라보토리 이동식 틈새 접이식 수납 정리함 트롤리"
+                + " / 가격=미확인"
+                + " / 할인=미확인"
+                + " / 옵션가=23,570원, 10,710원, 12,400원"
+                + " / 배송비 입력=15,000원 이상 구매 시 무료배송, 미충족 시 배송비 3,000원";
+        Map<String, Object> aggregate = new LinkedHashMap<>();
+        aggregate.put("order", Map.of(
+                "priceText", "",
+                "detailDescription", detailDescription
+        ));
+        aggregate.put("sourceEvidence", Map.of(
+                "userInput", Map.of(
+                        "detailDescription", detailDescription,
+                        "shippingPolicyText", "15,000원 이상 구매 시 무료배송, 미충족 시 배송비 3,000원"
+                ),
+                "url", Map.of("priceText", ""),
+                "image", Map.of("items", List.of(Map.of(
+                        "visiblePrices", List.of("23,570원", "10,710원", "12,400원")
+                ))),
+                "shopping", Map.of("used", true)
+        ));
+
+        Method method = PipelineJavaService.class.getDeclaredMethod("buildGroundingChecklistMarkdown", Map.class);
+        method.setAccessible(true);
+        String checklist = (String) method.invoke(service, aggregate);
+
+        assertThat(checklist)
+                .contains("표시가(캡처): 미확인")
+                .contains("할인(캡처): 미확인")
+                .contains("옵션/구성 또는 관련 가격 문구(캡처): 23,570원, 10,710원, 12,400원")
+                .contains("표시가와 별도로 옵션/구성/추천상품 가격이 혼재할 수 있으므로 실구매가 확정 근거로 단정하지 않음");
     }
 
     // helpers matching PipelineJavaService logic

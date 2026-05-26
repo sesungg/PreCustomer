@@ -3,6 +3,7 @@ package com.example.personareport.report.pipeline;
 import com.example.personareport.report.pipeline.dto.PipelineRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -16,6 +17,8 @@ import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -585,6 +588,7 @@ public class PipelineJavaService {
             orderMap.put("targetCustomer", compact(str(order.get("target_customer")), 3000));
             orderMap.put("mainQuestion", compact(str(order.get("main_question")), 3000));
             orderMap.put("priceText", str(order.get("price_text")));
+            orderMap.put("shippingPolicyText", str(order.get("shipping_policy_text")));
             orderMap.put("pageUrl", str(order.get("page_url")));
             orderMap.put("targetType", str(order.get("target_type")));
             orderMap.put("reportPerspective", str(order.get("report_perspective")));
@@ -1149,6 +1153,7 @@ public class PipelineJavaService {
                 "targetCustomer", compact(str(order.get("target_customer")), 1800),
                 "mainQuestion", compact(str(order.get("main_question")), 1800),
                 "priceText", str(order.get("price_text")),
+                "shippingPolicyText", str(order.get("shipping_policy_text")),
                 "targetType", str(order.get("target_type")),
                 "reportPerspective", str(order.get("report_perspective"))
         ));
@@ -1165,7 +1170,7 @@ public class PipelineJavaService {
         ));
         aggregate.put("sampleResponses", sampleResponses(responses, 8));
         aggregate.put("sourceEvidence", buildSourceEvidence(
-                snapshot, imageAnalyses, shoppingEvidence, shoppingProducts));
+                order, snapshot, imageAnalyses, shoppingEvidence, shoppingProducts));
 
         if (!snapshot.isEmpty()) {
             aggregate.put("snapshot", Map.of(
@@ -1334,6 +1339,19 @@ public class PipelineJavaService {
         if (str(result.get("reportMarkdown")).isEmpty()) {
             result.put("reportMarkdown", buildFallbackMarkdown(result, aggregate));
         }
+        result.put("reportMarkdown", sanitizeUngroundedPriceClaims(str(result.get("reportMarkdown"))));
+        String groundingChecklistMarkdown = buildGroundingChecklistMarkdown(aggregate);
+        if (!groundingChecklistMarkdown.isBlank()) {
+            String reportMarkdown = str(result.get("reportMarkdown"));
+            String marker = "<!-- SYSTEM_GROUNDING_CHECKLIST -->";
+            if (!reportMarkdown.contains(marker)) {
+                String checklistToAppend = reportMarkdown.contains("## 확인된 근거 체크리스트")
+                        ? groundingChecklistMarkdown.replaceFirst("## 확인된 근거 체크리스트", "## 시스템 검증 근거 체크리스트")
+                        : groundingChecklistMarkdown;
+                result.put("reportMarkdown", reportMarkdown + "\n\n" + marker + "\n" + checklistToAppend);
+            }
+            result.put("groundingChecklistMarkdown", groundingChecklistMarkdown);
+        }
 
         for (String key : List.of("keyMetrics", "priceAnalysis", "trustAnalysis")) {
             Object v = result.get(key);
@@ -1373,6 +1391,334 @@ public class PipelineJavaService {
                 + "## 개선 방향\n" + str(report.get("improvementSummary"));
     }
 
+    private String sanitizeUngroundedPriceClaims(String markdown) {
+        if (markdown.isBlank()) return markdown;
+        String sanitized = markdown;
+        sanitized = sanitized.replaceAll("정가\\(예:\\s*[^)]+\\)", "정가(캡처 기준 미확인)");
+        sanitized = sanitized.replaceAll("정가\\s*[0-9,]+원에서\\s*([0-9]+%\\s*할인된\\s*)?([0-9,]+원)", "정가 미확인, 할인가 $2");
+        sanitized = sanitized.replaceAll("정가\\s*[0-9,]+원\\s*대비", "정가 미확인 대비");
+        return sanitized;
+    }
+
+    private String buildGroundingChecklistMarkdown(Map<String, Object> aggregate) {
+        Map<String, Object> order = safeMap(aggregate, "order");
+        Map<String, Object> sourceEvidence = safeMap(aggregate, "sourceEvidence");
+        Map<String, Object> userInput = safeMap(sourceEvidence, "userInput");
+        Map<String, Object> url = safeMap(sourceEvidence, "url");
+        Map<String, Object> image = safeMap(sourceEvidence, "image");
+        Map<String, Object> shopping = safeMap(sourceEvidence, "shopping");
+        List<Object> imageItems = safeList(image.get("items"));
+
+        String shippingPolicyText = str(userInput.get("shippingPolicyText"));
+        String imagePriceEvidence = joinEvidence(imageItems, "visiblePrices", 8, 120);
+        String orderPriceText = firstNonBlank(str(order.get("priceText")), str(url.get("priceText")));
+        String detailDescription = firstNonBlank(str(userInput.get("detailDescription")), str(order.get("detailDescription")));
+        String userPriceEvidence = extractUserPriceEvidence(detailDescription, 220);
+        String capturedDisplayPrice = normalizeEvidenceField(extractLabeledEvidence(detailDescription, "가격"));
+        String capturedDiscount = normalizeEvidenceField(extractLabeledEvidence(detailDescription, "할인"));
+        String capturedOptionPrices = normalizeEvidenceField(extractLabeledEvidence(detailDescription, "옵션가"));
+        String optionOrRelatedPriceEvidence = !"미확인".equals(capturedOptionPrices)
+                ? capturedOptionPrices
+                : "";
+        optionOrRelatedPriceEvidence = firstNonBlank(optionOrRelatedPriceEvidence, imagePriceEvidence);
+        String reviewEvidence = buildReviewEvidence(url, imageItems);
+        String shoppingNote = "";
+        if (Boolean.TRUE.equals(shopping.get("used"))) {
+            shoppingNote = "네이버 쇼핑 비교 데이터는 보조 가격 비교용입니다. 배송비/리뷰/평점 판단에는 사용자 입력과 캡처 이미지 근거를 우선합니다.";
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("## 확인된 근거 체크리스트\n\n");
+        sb.append("- 배송비 정책(사용자 입력): ")
+                .append(shippingPolicyText.isBlank() ? "미입력 - 배송비는 미확인으로만 다뤄야 함" : shippingPolicyText)
+                .append("\n");
+        sb.append("- 가격/할인 근거: ")
+                .append(joinEvidenceParts(
+                        orderPriceText.isBlank() ? "" : "사용자 입력 가격=" + orderPriceText,
+                        userPriceEvidence.isBlank() ? "" : "사용자 입력 요약=" + userPriceEvidence,
+                        imagePriceEvidence.isBlank() ? "" : "캡처 가격 문구(관련/추천 상품 가격 혼재 가능)=" + imagePriceEvidence,
+                        "캡처 기준 미확인"))
+                .append("\n");
+        sb.append("- 표시가(캡처): ")
+                .append(capturedDisplayPrice.isBlank() ? "미확인" : capturedDisplayPrice)
+                .append("\n");
+        if (!capturedDiscount.isBlank()) {
+            sb.append("- 할인(캡처): ").append(capturedDiscount).append("\n");
+        }
+        if (!optionOrRelatedPriceEvidence.isBlank()) {
+            sb.append("- 옵션/구성 또는 관련 가격 문구(캡처): ")
+                    .append(optionOrRelatedPriceEvidence)
+                    .append(" - 표시가와 별도로 옵션/구성/추천상품 가격이 혼재할 수 있으므로 실구매가 확정 근거로 단정하지 않음\n");
+        }
+        sb.append("- 리뷰/평점: ")
+                .append(firstNonBlank(reviewEvidence, "캡처 기준 미확인"))
+                .append("\n");
+        if (!shoppingNote.isBlank()) {
+            sb.append("- 외부 가격 비교 한계: ").append(shoppingNote).append("\n");
+        }
+
+        List<String> detailEvidence = buildImageDetailEvidence(imageItems);
+        if (!detailEvidence.isEmpty()) {
+            sb.append("\n### 상세페이지 이미지 근거\n");
+            for (String line : detailEvidence) {
+                sb.append("- ").append(line).append("\n");
+            }
+        }
+        List<String> structuredEvidence = buildStructuredImageEvidence(imageItems);
+        if (!structuredEvidence.isEmpty()) {
+            sb.append("\n### 상세페이지 핵심 정보 목록\n");
+            for (String line : structuredEvidence) {
+                sb.append("- ").append(line).append("\n");
+            }
+        }
+        sb.append("\n### 근거 해석 원칙\n");
+        sb.append("- 위 항목은 캡처 이미지와 사용자 입력에서 확인된 사실이며, 개선 제안과 구분해야 합니다.\n");
+        sb.append("- 캡처나 입력값에 없는 할인율, 리뷰 수, 평점, 구성품, 원산지, 용량, 소재, 기능, 주의사항은 사실처럼 단정하지 않습니다.");
+        return sb.toString();
+    }
+
+    private String buildReviewEvidence(Map<String, Object> url, List<Object> imageItems) {
+        List<String> evidence = new ArrayList<>();
+        String reviewCount = str(url.get("reviewCount"));
+        if (!reviewCount.isBlank() && !"null".equalsIgnoreCase(reviewCount)) {
+            evidence.add("URL 추출 리뷰 수 " + reviewCount);
+        }
+        String ratingScore = str(url.get("ratingScore"));
+        if (!ratingScore.isBlank() && !"null".equalsIgnoreCase(ratingScore)) {
+            evidence.add("URL 추출 평점 " + ratingScore);
+        }
+        for (Object item : imageItems) {
+            Map<String, Object> row = safeMap(item);
+            String visibleText = str(row.get("visibleText"));
+            String summary = str(row.get("imageSummary"));
+            String combined = firstNonBlank(visibleText, summary);
+            if (containsAny(combined, List.of("리뷰", "후기", "상품평", "평점", "별점", "만족도", "긍정"))) {
+                evidence.add(compact(combined, 160));
+            }
+            if (evidence.size() >= 5) break;
+        }
+        return evidence.stream().filter(s -> !s.isBlank()).distinct().collect(Collectors.joining(" / "));
+    }
+
+    private List<String> buildImageDetailEvidence(List<Object> imageItems) {
+        List<String> evidence = new ArrayList<>();
+        int index = 1;
+        for (Object item : imageItems) {
+            Map<String, Object> row = safeMap(item);
+            List<String> parts = new ArrayList<>();
+            addPart(parts, "요약", row.get("imageSummary"), 180);
+            addPart(parts, "보이는 문구", row.get("visibleText"), 180);
+            String specSnippets = extractKeywordSnippets(
+                    firstNonBlank(str(row.get("visibleSpecSnippets")), String.join(" / ", List.of(
+                            evidenceText(row.get("visibleText")),
+                            evidenceText(row.get("visibleClaims")),
+                            evidenceText(row.get("visibleUsageInstructions")),
+                            evidenceText(row.get("safetyOrComplianceNotes"))))),
+                    List.of("재질", "소재", "성분", "용량", "중량", "사이즈", "크기", "규격",
+                            "원산지", "제조국", "Made in", "제조원", "수입", "제품명", "색상",
+                            "구성품", "구성", "주의", "Notice", "사용 시", "사용방법", "보관", "반품", "교환"),
+                    18,
+                    120);
+            if (!specSnippets.isBlank()) {
+                parts.add("상세 스펙/주의: " + specSnippets);
+            }
+            addPart(parts, "가격", row.get("visiblePrices"), 160);
+            addPart(parts, "핵심 주장", row.get("visibleClaims"), 180);
+            addPart(parts, "인증/신뢰", row.get("visibleCertifications"), 160);
+            addPart(parts, "사용/주의", row.get("visibleUsageInstructions"), 160);
+            addPart(parts, "구매 동인", row.get("visualPurchaseDrivers"), 160);
+            addPart(parts, "구매 저항", row.get("visualPurchaseBarriers"), 160);
+            addPart(parts, "안전/준수", row.get("safetyOrComplianceNotes"), 160);
+            if (!parts.isEmpty()) {
+                evidence.add("이미지 " + index + ": " + String.join(" / ", parts));
+            }
+            index++;
+        }
+        return evidence;
+    }
+
+    private List<String> buildStructuredImageEvidence(List<Object> imageItems) {
+        List<String> evidence = new ArrayList<>();
+        List<String> functions = collectImageEvidence(
+                imageItems,
+                List.of("visibleClaims", "visibleText"),
+                List.of("PD 3.0", "초고속 충전", "PD 25W", "고속 충전", "GaN", "C타입", "호환"),
+                12,
+                220);
+        List<String> specs = collectImageEvidence(
+                imageItems,
+                List.of("visibleText", "visibleClaims"),
+                List.of("구성품", "재질", "소재", "사이즈", "크기", "제조국", "Made in", "KC 인증", "모델명"),
+                12,
+                220);
+        List<String> cautions = collectImageEvidence(
+                imageItems,
+                List.of("visibleUsageInstructions", "safetyOrComplianceNotes", "visibleText", "informationGaps"),
+                List.of("주의", "NOTICE", "본 제품", "케이블", "충전 속도", "표시 안", "상이", "보관", "반품", "교환"),
+                12,
+                260);
+
+        if (!functions.isEmpty()) {
+            evidence.add("기능/핵심 주장: " + String.join(" / ", functions));
+        }
+        if (!specs.isEmpty()) {
+            evidence.add("구성/스펙/원산지/소재: " + String.join(" / ", specs));
+        }
+        if (!cautions.isEmpty()) {
+            evidence.add("사용/주의사항: " + String.join(" / ", cautions));
+        }
+        return evidence;
+    }
+
+    private List<String> collectImageEvidence(List<Object> imageItems, List<String> fields,
+                                              List<String> keywords, int limit, int window) {
+        List<String> snippets = new ArrayList<>();
+        for (Object item : imageItems) {
+            Map<String, Object> row = safeMap(item);
+            for (String field : fields) {
+                String text = evidenceText(row.get(field));
+                if (text.isBlank()) {
+                    continue;
+                }
+                String extracted = extractKeywordSnippets(text, keywords, 2, window);
+                if (!extracted.isBlank()) {
+                    snippets.addAll(Arrays.stream(extracted.split("\\s*/\\s*"))
+                            .map(String::trim)
+                            .filter(value -> !value.isBlank())
+                            .toList());
+                }
+                if (snippets.size() >= limit) {
+                    return snippets.stream().distinct().limit(limit).toList();
+                }
+            }
+        }
+        return snippets.stream().distinct().limit(limit).toList();
+    }
+
+    private void addPart(List<String> parts, String label, Object value, int maxLen) {
+        String text = evidenceText(value);
+        if (!text.isBlank()) {
+            parts.add(label + ": " + compact(text, maxLen));
+        }
+    }
+
+    private String joinEvidence(List<Object> items, String key, int limit, int maxLen) {
+        List<String> values = new ArrayList<>();
+        for (Object item : items) {
+            String text = evidenceText(safeMap(item).get(key));
+            if (!text.isBlank()) {
+                values.add(compact(text, maxLen));
+            }
+            if (values.size() >= limit) break;
+        }
+        return values.stream().distinct().collect(Collectors.joining(" / "));
+    }
+
+    private String joinEvidenceParts(String... values) {
+        if (values == null || values.length == 0) return "";
+        List<String> parts = new ArrayList<>();
+        for (int i = 0; i < values.length - 1; i++) {
+            String value = str(values[i]);
+            if (!value.isBlank()) parts.add(value);
+        }
+        if (!parts.isEmpty()) return parts.stream().distinct().collect(Collectors.joining(" / "));
+        return str(values[values.length - 1]);
+    }
+
+    @SuppressWarnings("unchecked")
+    private String evidenceText(Object value) {
+        if (value == null) return "";
+        if (value instanceof List<?> list) {
+            return list.stream().map(this::evidenceText).filter(s -> !s.isBlank())
+                    .collect(Collectors.joining(", "));
+        }
+        if (value instanceof Map<?, ?> map) {
+            return map.values().stream().map(this::evidenceText).filter(s -> !s.isBlank())
+                    .collect(Collectors.joining(", "));
+        }
+        String text = str(value);
+        if (text.isBlank() || "[]".equals(text) || "{}".equals(text) || "null".equalsIgnoreCase(text)) {
+            return "";
+        }
+        if ((text.startsWith("[") && text.endsWith("]")) || (text.startsWith("{") && text.endsWith("}"))) {
+            try {
+                Object parsed = objectMapper.readValue(text, Object.class);
+                if (parsed instanceof List<?> || parsed instanceof Map<?, ?>) {
+                    return evidenceText(parsed);
+                }
+            } catch (Exception ignored) {}
+        }
+        return text;
+    }
+
+    private String extractKeywordSnippets(String text, List<String> keywords, int limit, int window) {
+        String source = str(text);
+        if (source.isBlank()) return "";
+        List<String> snippets = new ArrayList<>();
+        for (String keyword : keywords) {
+            int idx = source.indexOf(keyword);
+            if (idx < 0) continue;
+            int start = Math.max(0, idx - Math.max(0, window / 3));
+            int end = Math.min(source.length(), idx + keyword.length() + window);
+            String snippet = source.substring(start, end)
+                    .replaceAll("\\s+", " ")
+                    .replaceAll("^\\s*[,/|:：-]+\\s*", "")
+                    .replaceAll("\\s*[,/|:：-]+\\s*$", "")
+                    .trim();
+            if (!snippet.isBlank()) {
+                snippets.add(snippet);
+            }
+            if (snippets.size() >= limit) break;
+        }
+        return snippets.stream()
+                .distinct()
+                .limit(limit)
+                .collect(Collectors.joining(" / "));
+    }
+
+    private String extractUserPriceEvidence(String text, int maxLen) {
+        String source = str(text).replaceAll("\\s+", " ").trim();
+        if (source.isBlank()) return "";
+        for (String sentence : source.split("(?<=[.!?。다])\\s+")) {
+            String normalized = sentence.trim();
+            if (normalized.isBlank()) continue;
+            if ((normalized.contains("가격") || normalized.contains("할인") || normalized.contains("할인가") || normalized.contains("%"))
+                    && normalized.contains("원")) {
+                return compact(normalized, maxLen);
+            }
+        }
+        return compact(extractKeywordSnippets(source, List.of("가격", "할인", "할인가", "%", "원"), 1, maxLen), maxLen);
+    }
+
+    private String extractLabeledEvidence(String text, String label) {
+        String source = str(text).replaceAll("\\s+", " ").trim();
+        if (source.isBlank() || label == null || label.isBlank()) return "";
+        Pattern pattern = Pattern.compile("(?:^|[/\\n])\\s*" + Pattern.quote(label) + "\\s*=\\s*([^/\\n]+)");
+        Matcher matcher = pattern.matcher(source);
+        if (!matcher.find()) return "";
+        return compact(matcher.group(1), 260);
+    }
+
+    private String normalizeEvidenceField(String value) {
+        String normalized = str(value)
+                .replaceAll("\\s+", " ")
+                .replaceAll("\\s*/\\s*$", "")
+                .trim();
+        if (normalized.isBlank()
+                || "null".equalsIgnoreCase(normalized)
+                || "없음".equals(normalized)
+                || "미입력".equals(normalized)) {
+            return "";
+        }
+        return normalized;
+    }
+
+    private boolean containsAny(String text, List<String> terms) {
+        String source = str(text);
+        if (source.isBlank()) return false;
+        return terms.stream().anyMatch(source::contains);
+    }
+
     // =========================================================================
     // ── Reaction / Product Payload Builder ─────────────────────────
     // =========================================================================
@@ -1394,6 +1740,7 @@ public class PipelineJavaService {
             orderMap.put("targetCustomer", compact(str(order.get("target_customer")), 2000));
             orderMap.put("mainQuestion", compact(str(order.get("main_question")), 2000));
             orderMap.put("priceText", str(order.get("price_text")));
+            orderMap.put("shippingPolicyText", str(order.get("shipping_policy_text")));
             orderMap.put("targetType", str(order.get("target_type")));
             orderMap.put("reportPerspective", str(order.get("report_perspective")));
             payload.put("order", orderMap);
@@ -1416,7 +1763,7 @@ public class PipelineJavaService {
 
             payload.put("imageAnalyses", imageAnalyses != null ? imageAnalyses : List.of());
             payload.put("sourceEvidence", buildSourceEvidence(
-                    snapshot, imageAnalyses, shoppingEvidence, shoppingProducts));
+                    order, snapshot, imageAnalyses, shoppingEvidence, shoppingProducts));
 
             // productTargetProfile
             payload.put("productTargetProfile", extractProfileData(productProfile));
@@ -1427,7 +1774,8 @@ public class PipelineJavaService {
         }
     }
 
-    private Map<String, Object> buildSourceEvidence(Map<String, Object> snapshot,
+    private Map<String, Object> buildSourceEvidence(Map<String, Object> order,
+                                                     Map<String, Object> snapshot,
                                                      List<Map<String, Object>> imageAnalyses,
                                                      Map<String, Object> shoppingEvidence,
                                                      List<Map<String, Object>> shoppingProducts) {
@@ -1439,6 +1787,17 @@ public class PipelineJavaService {
         String snapshotStatus = str(snapshot.get("snapshot_status")).toUpperCase();
         boolean captured = "CAPTURED".equals(snapshotStatus) || "SUCCESS".equals(snapshotStatus);
         boolean screenshotPrimary = "SCREENSHOT_PRIMARY".equals(snapshotStatus);
+
+        Map<String, Object> userInput = new LinkedHashMap<>();
+        String shippingPolicyText = str(order.get("shipping_policy_text"));
+        userInput.put("priceText", str(order.get("price_text")));
+        userInput.put("detailDescription", compact(str(order.get("detail_description")), 1200));
+        userInput.put("shippingPolicyText", shippingPolicyText);
+        userInput.put("shippingPolicySource", shippingPolicyText.isBlank() ? "미입력" : "사용자 직접 입력");
+        userInput.put("shippingPolicyRule", shippingPolicyText.isBlank()
+                ? "배송비 정책 입력값이 없으면 배송비를 미확인으로 표시하고 네이버 쇼핑 결과만으로 보완하지 않습니다."
+                : "배송비 정책은 사용자가 직접 입력한 값이므로 배송비 판단의 최우선 근거입니다. 조건부/멤버십 무료배송은 조건을 그대로 남기고 일반 무료배송처럼 단정하지 않습니다.");
+        evidence.put("userInput", userInput);
 
         Map<String, Object> url = new LinkedHashMap<>();
         url.put("crawlStatus", snapshot.isEmpty() ? "MISSING" : snapshotStatus);
@@ -1453,7 +1812,7 @@ public class PipelineJavaService {
         url.put("deliveryType", rawMeta.get("deliveryType"));
         url.put("shippingAmount", rawMeta.get("product_shipping_amount"));
         url.put("note", captured
-                ? "URL 직접 추출 데이터입니다. 가격, 후기, 평점, 배송비가 있으면 이 값을 최우선으로 사용합니다."
+                ? "URL 직접 추출 데이터입니다. 가격, 후기, 평점은 객관 근거로 사용하되 배송비는 사용자 직접 입력값이 있으면 그 값을 우선합니다."
                 : screenshotPrimary
                 ? "업로드된 상세페이지 전체 캡처 이미지를 1차 근거로 사용합니다. URL 데이터가 아니라 이미지 OCR/시각 분석 데이터로 판단하십시오."
                 : "URL 직접 추출이 실패했거나 확인되지 않았습니다. 후기/평점 부재를 사실로 단정하지 마십시오.");
@@ -1461,7 +1820,8 @@ public class PipelineJavaService {
 
         Map<String, Object> priceRules = new LinkedHashMap<>();
         priceRules.put("priceTrustSeparation", "원산지/수입육 신뢰도는 trustScore에서 다루고 priceAcceptanceScore를 직접 낮추는 근거로 쓰지 않습니다.");
-        priceRules.put("shippingRule", "가격 경쟁력은 배송비 포함 실구매가를 우선합니다. 배송비가 미확인인 경우 표시가 기준 가격과 불확실성을 함께 언급합니다.");
+        priceRules.put("shippingRule", "가격 경쟁력은 배송비 포함 실구매가를 우선합니다. sourceEvidence.userInput.shippingPolicyText가 있으면 이 값을 배송비 판단의 최우선 근거로 사용하고, 조건부 무료배송/멤버십 무료배송은 조건을 명시한 채 불확실성을 유지합니다.");
+        priceRules.put("claimGroundingRule", "캡처 이미지, 사용자 입력, URL, 네이버 쇼핑, LLM 추론을 구분합니다. 근거에 없는 할인율, 리뷰 수, 평점, 원산지, 구성품, 효능, 인증, 배송 조건은 단정하지 않습니다.");
         priceRules.put("reviewRule", "reviewCount/ratingScore가 없더라도 URL 크롤링 실패라면 '후기 부재'라고 쓰지 말고 '후기 확인 실패/미확인'으로 표현합니다.");
         priceRules.put("freshFoodReturnRule", "냉동/신선식품의 단순 변심 반품 제한은 일반적인 카테고리 조건으로 다루고 과도한 리스크로 강조하지 않습니다.");
         evidence.put("evaluationRules", priceRules);
@@ -1482,14 +1842,24 @@ public class PipelineJavaService {
         Map<String, Object> image = new LinkedHashMap<>();
         image.put("count", imageAnalyses != null ? imageAnalyses.size() : 0);
         image.put("visibleOnlyRule", "이미지 근거는 OCR/시각 분석으로 실제 보이는 정보만 사용합니다. URL 상세 본문, 리뷰, 평점, 배송비와 섞지 않습니다.");
-        image.put("items", summarizeImageAnalyses(imageAnalyses, 8));
+        image.put("items", summarizeImageAnalyses(imageAnalyses, 20));
+        if (imageAnalyses != null && imageAnalyses.size() > 20) {
+            image.put("truncationNote", "이미지 분석이 20개를 초과해 요약 목록은 20개까지만 포함합니다. 전체 imageAnalyses 배열의 원문도 함께 참고해야 합니다.");
+        }
         evidence.put("image", image);
 
-        evidence.put("sourcePriority", List.of(
-                "URL_EXTRACTED_OBJECTIVE_DATA",
-                "IMAGE_OCR_OR_VISION_DATA",
-                "NAVER_SHOPPING_COMPARISON_DATA",
-                "LLM_INFERENCE"));
+        List<String> sourcePriority = new ArrayList<>();
+        sourcePriority.add("USER_INPUT_SHIPPING_POLICY_FOR_SHIPPING");
+        if (screenshotPrimary) {
+            sourcePriority.add("IMAGE_OCR_OR_VISION_DATA");
+            sourcePriority.add("URL_EXTRACTED_OBJECTIVE_DATA");
+        } else {
+            sourcePriority.add("URL_EXTRACTED_OBJECTIVE_DATA");
+            sourcePriority.add("IMAGE_OCR_OR_VISION_DATA");
+        }
+        sourcePriority.add("NAVER_SHOPPING_COMPARISON_DATA");
+        sourcePriority.add("LLM_INFERENCE");
+        evidence.put("sourcePriority", sourcePriority);
         return evidence;
     }
 
@@ -1524,7 +1894,25 @@ public class PipelineJavaService {
             row.put("imagePath", str(image.get("imagePath")));
             row.put("imageSummary", compact(str(image.get("imageSummary")), 280));
             row.put("visibleText", compact(str(image.get("visibleText")), 280));
+            row.put("visibleClaims", image.get("visibleClaims"));
             row.put("visiblePrices", image.get("visiblePrices"));
+            row.put("visibleCertifications", image.get("visibleCertifications"));
+            row.put("visibleUsageInstructions", image.get("visibleUsageInstructions"));
+            row.put("visibleSpecSnippets", extractKeywordSnippets(
+                    String.join(" / ", List.of(
+                            str(image.get("visibleText")),
+                            evidenceText(image.get("visibleClaims")),
+                            evidenceText(image.get("visibleUsageInstructions")),
+                            evidenceText(image.get("safetyOrComplianceNotes")))),
+                    List.of("재질", "소재", "성분", "용량", "중량", "사이즈", "크기", "규격",
+                            "원산지", "제조국", "Made in", "제조원", "수입", "제품명", "색상",
+                            "구성품", "구성", "주의", "Notice", "사용 시", "사용방법", "보관", "반품", "교환"),
+                    18,
+                    120));
+            row.put("visualTrustElements", image.get("visualTrustElements"));
+            row.put("visualPurchaseDrivers", image.get("visualPurchaseDrivers"));
+            row.put("visualPurchaseBarriers", image.get("visualPurchaseBarriers"));
+            row.put("safetyOrComplianceNotes", image.get("safetyOrComplianceNotes"));
             row.put("informationGaps", image.get("informationGaps"));
             rows.add(row);
         }
@@ -1836,6 +2224,17 @@ public class PipelineJavaService {
     private List<Object> safeList(Object o) {
         if (o instanceof List) return (List<Object>) o;
         return List.of();
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> safeMap(Object o) {
+        if (o instanceof Map) return (Map<String, Object>) o;
+        return Map.of();
+    }
+
+    private Map<String, Object> safeMap(Map<String, Object> source, String key) {
+        if (source == null) return Map.of();
+        return safeMap(source.get(key));
     }
 
     @SuppressWarnings("unchecked")

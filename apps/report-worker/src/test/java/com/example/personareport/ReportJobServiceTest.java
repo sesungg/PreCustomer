@@ -3,10 +3,10 @@ package com.example.personareport;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.personareport.modules.shopping.client.NaverShoppingFeignClient;
+import com.example.personareport.order.domain.ReactionReportOrder;
 import com.example.personareport.order.domain.ReportPerspective;
 import com.example.personareport.order.domain.TargetType;
-import com.example.personareport.order.dto.OrderRequest;
-import com.example.personareport.order.service.OrderService;
+import com.example.personareport.order.repository.ReactionReportOrderRepository;
 import com.example.personareport.report.job.ReportJobRepository;
 import com.example.personareport.report.job.ReportJobService;
 import com.example.personareport.report.job.ReportJobStatus;
@@ -32,7 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 class ReportJobServiceTest {
 
     @Autowired
-    private OrderService orderService;
+    private ReactionReportOrderRepository orderRepository;
 
     @Autowired
     private ReportJobService jobService;
@@ -175,7 +175,7 @@ class ReportJobServiceTest {
     }
 
     private Long createOrder() {
-        var request = new OrderRequest(
+        var order = ReactionReportOrder.create(
                 "job-test@example.com",
                 "잡 테스트 상품",
                 TargetType.ETC,
@@ -183,11 +183,12 @@ class ReportJobServiceTest {
                 "상세 설명",
                 null,
                 "10,000원",
+                "완전 무료배송",
                 "타겟",
                 "질문",
                 ReportPerspective.GENERAL_REACTION,
                 true
         );
-        return orderService.createOrder(request, null).getId();
+        return orderRepository.saveAndFlush(order).getId();
     }
 }

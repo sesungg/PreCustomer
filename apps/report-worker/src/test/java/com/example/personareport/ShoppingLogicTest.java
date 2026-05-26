@@ -1,10 +1,17 @@
 package com.example.personareport;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+import com.example.personareport.modules.shopping.service.ShoppingQueryExtractionService;
+import com.example.personareport.modules.shopping.service.ShoppingSearchService;
+import com.example.personareport.report.pipeline.DeepSeekService;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 /** ShoppingSearchService의 순수 계산 로직 단위 테스트 */
 class ShoppingLogicTest {
@@ -198,6 +205,70 @@ class ShoppingLogicTest {
         String sort = "sim";
         String key = productId + "|" + sort;
         assertThat(key).isEqualTo("12345678|sim");
+    }
+
+    @Test
+    void competitorQuery_removesSelfBrandAndDeviceBrandTokens() {
+        String query = ShoppingSearchService.buildCompetitorQuery(
+                "EDITOR PD 25W 아이폰 갤럭시 고속 c타입 충전기 + 케이블 세트",
+                "가격은 4,400원이며 36% 할인이 적용되었습니다.",
+                null);
+
+        assertThat(query).doesNotContain("EDITOR", "PD", "25W", "아이폰", "갤럭시");
+        assertThat(query).contains("고속", "c타입", "충전기", "케이블", "세트");
+        assertThat(ShoppingSearchService.needsAiCompetitorQuery(
+                "EDITOR PD 25W 아이폰 갤럭시 고속 c타입 충전기 + 케이블 세트", query))
+                .isFalse();
+    }
+
+    @Test
+    void competitorQuery_flagsWeakSelfProductQueryForAiExtraction() {
+        assertThat(ShoppingSearchService.needsAiCompetitorQuery(
+                "EDITOR PD 25W 아이폰 갤럭시 고속 c타입 충전기 + 케이블 세트",
+                "EDITOR PD 25W 아이폰 갤럭시 고속 c타입 충전기 케이블 세트"))
+                .isTrue();
+    }
+
+    @Test
+    void competitorQuery_acceptsSingleWordCategoryWhenItIsNotSelfBrand() {
+        assertThat(ShoppingSearchService.needsAiCompetitorQuery("루메나 손풍기", "손풍기"))
+                .isFalse();
+    }
+
+    @Test
+    void competitorQuery_treatsBrandContainingCategorySyllableAsSelfBrand() {
+        assertThat(ShoppingSearchService.needsAiCompetitorQuery(
+                "프로티원 단백질 쉐이크 곡물맛, 490g, 1개",
+                "프로티원 단백질 쉐이크"))
+                .isTrue();
+    }
+
+    @Test
+    void queryExtractionService_usesDeepSeekWhenHeuristicIsTooWeak() {
+        DeepSeekService deepSeekService = Mockito.mock(DeepSeekService.class);
+        ShoppingQueryExtractionService service = new ShoppingQueryExtractionService(deepSeekService);
+        when(deepSeekService.callDeepSeek(
+                Mockito.anyString(), Mockito.anyString(), Mockito.anyString(), Mockito.anyDouble(), Mockito.anyInt(), Mockito.anyString()))
+                .thenReturn(Map.of("query", "고속 c타입 충전기 케이블 세트"));
+
+        String query = service.buildCompetitorQuery("ACME X100", "가격 4,400원", null);
+
+        assertThat(query).isEqualTo("고속 c타입 충전기 케이블 세트");
+    }
+
+    @Test
+    void queryExtractionService_skipsDeepSeekWhenHeuristicIsStrong() {
+        DeepSeekService deepSeekService = Mockito.mock(DeepSeekService.class);
+        ShoppingQueryExtractionService service = new ShoppingQueryExtractionService(deepSeekService);
+
+        String query = service.buildCompetitorQuery(
+                "EDITOR PD 25W 아이폰 갤럭시 고속 c타입 충전기 + 케이블 세트",
+                "가격은 4,400원이며 36% 할인이 적용되었습니다.",
+                null);
+
+        assertThat(query).isEqualTo("고속 c타입 충전기 케이블 세트");
+        verify(deepSeekService, never()).callDeepSeek(
+                Mockito.anyString(), Mockito.anyString(), Mockito.anyString(), Mockito.anyDouble(), Mockito.anyInt(), Mockito.anyString());
     }
 
     // helpers matching ShoppingSearchService logic
