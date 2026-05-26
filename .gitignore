@@ -3,10 +3,13 @@
 *.log
 logs/
 build/
+target/
+**/target/
 .gradle/
 .idea/
 uploads/*
 !uploads/.gitkeep
+page_snapshots/
 .omc/
 .omx/
 .lazyweb/

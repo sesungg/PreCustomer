@@ -1,6 +1,6 @@
 FROM eclipse-temurin:17-jre
 
-ARG JAR_FILE=apps/combined-web/build/libs/precustomer-combined-web-0.0.1-SNAPSHOT.jar
+ARG JAR_FILE=apps/api-gateway/build/libs/precustomer-api-gateway-0.0.1-SNAPSHOT.jar
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \

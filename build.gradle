@@ -42,18 +42,10 @@ def registerRootBootRun(String taskName, String modulePath, String mainClassName
 
 registerRootBootRun(
         'bootRun',
-        ':apps:combined-web',
-        'com.example.personareport.CombinedWebApplication',
-        'local,web',
-        'Run the combined public/admin web process.'
-)
-
-registerRootBootRun(
-        'bootRunWeb',
-        ':apps:combined-web',
-        'com.example.personareport.CombinedWebApplication',
-        'local,web',
-        'Run the combined public/admin web process without the report worker.'
+        ':apps:api-gateway',
+        'com.example.personareport.gateway.ApiGatewayApplication',
+        'local,gateway',
+        'Run the Spring Cloud API gateway.'
 )
 
 registerRootBootRun(
@@ -90,7 +82,7 @@ registerRootBootRun(
 
 tasks.register('bootRunAll') {
     group = 'application'
-    description = 'Disabled guard task: run application processes in separate terminals instead.'
+    description = 'Disabled guard task: run gateway, public-web, admin-web, and report-worker in separate terminals instead.'
     enabled = false
 }
 
@@ -98,7 +90,6 @@ tasks.register('bootJarAll') {
     group = 'build'
     description = 'Build all executable application jars.'
     dependsOn ':apps:api-gateway:bootJar',
-            ':apps:combined-web:bootJar',
             ':apps:public-web:bootJar',
             ':apps:admin-web:bootJar',
             ':apps:report-worker:bootJar'
